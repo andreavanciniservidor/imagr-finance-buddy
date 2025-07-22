@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./components/Dashboard";
 import BudgetPage from "./components/BudgetPage";
+import TransactionsPage from "./components/TransactionsPage";
 import ReportsPage from "./components/ReportsPage";
 import SettingsPage from "./components/SettingsPage";
 import NotFound from "./pages/NotFound";
@@ -23,8 +24,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/budget" element={<BudgetPage />} />
-            <Route path="/accounts" element={<Dashboard />} />
-            <Route path="/transactions" element={<Dashboard />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />

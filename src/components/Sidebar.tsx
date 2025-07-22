@@ -4,7 +4,6 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Target, 
-  CreditCard, 
   ArrowLeftRight, 
   FileText, 
   Settings,
@@ -15,7 +14,6 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Orçamento Doméstico', href: '/budget', icon: Target },
-  { name: 'Contas', href: '/accounts', icon: CreditCard },
   { name: 'Transações', href: '/transactions', icon: ArrowLeftRight },
   { name: 'Relatórios', href: '/reports', icon: FileText },
   { name: 'Configurações', href: '/settings', icon: Settings },
