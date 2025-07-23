@@ -19,7 +19,11 @@ const navigation = [
   { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 
-const Sidebar = () => {
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   return (
     <div className="flex h-screen w-64 flex-col bg-white border-r border-gray-200">
       <div className="flex h-16 items-center px-6 border-b border-gray-200">
@@ -31,6 +35,7 @@ const Sidebar = () => {
           <NavLink
             key={item.name}
             to={item.href}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                 isActive

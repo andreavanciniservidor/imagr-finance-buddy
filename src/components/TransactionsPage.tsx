@@ -87,7 +87,7 @@ const TransactionsPage = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Header - Mobile First */}
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Transações</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 lg:mt-0 mt-2">Transações</h1>
         
         {/* Botões - Stack em mobile, lado a lado em desktop */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
