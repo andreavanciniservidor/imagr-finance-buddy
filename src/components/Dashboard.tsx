@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, TrendingUp, TrendingDown, DollarSign, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,7 +74,13 @@ const Dashboard = () => {
 
       if (budgetsError) throw budgetsError;
 
-      setTransactions(transactionsData || []);
+      // Type assertion for transactions to ensure proper typing
+      const typedTransactions = (transactionsData || []).map(t => ({
+        ...t,
+        type: t.type as 'income' | 'expense'
+      }));
+
+      setTransactions(typedTransactions);
       setBudgets(budgetsData || []);
     } catch (error) {
       toast({

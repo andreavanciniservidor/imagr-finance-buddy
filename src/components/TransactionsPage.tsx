@@ -57,7 +57,14 @@ const TransactionsPage = () => {
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data || []);
+      
+      // Type assertion for transactions to ensure proper typing
+      const typedTransactions = (data || []).map(t => ({
+        ...t,
+        type: t.type as 'income' | 'expense'
+      }));
+      
+      setTransactions(typedTransactions);
     } catch (error) {
       toast({
         title: "Erro",

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,7 +39,14 @@ const ReportsPage = () => {
         `);
 
       if (error) throw error;
-      setTransactions(data || []);
+      
+      // Type assertion for transactions to ensure proper typing
+      const typedTransactions = (data || []).map(t => ({
+        ...t,
+        type: t.type as 'income' | 'expense'
+      }));
+      
+      setTransactions(typedTransactions);
     } catch (error) {
       toast({
         title: "Erro",
