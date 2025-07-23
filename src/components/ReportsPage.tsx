@@ -1,25 +1,88 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from './ui/use-toast';
+
+interface Transaction {
+  id: string;
+  date: string;
+  amount: number;
+  type: 'income' | 'expense';
+  categories: { name: string } | null;
+}
 
 const ReportsPage = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [period, setPeriod] = useState('Mês Atual');
   const [reportType, setReportType] = useState('Despesas por Categoria');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const summaryData = {
-    income: 5200,
-    expenses: 3500,
-    balance: 1700
+  useEffect(() => {
+    if (user) {
+      fetchTransactions();
+    }
+  }, [user]);
+
+  const fetchTransactions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(`
+          id,
+          date,
+          amount,
+          type,
+          categories(name)
+        `);
+
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar transações",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const categoryExpenses = [
-    { name: 'Alimentação', value: 880, color: 'bg-red-500' },
-    { name: 'Moradia', value: 1350, color: 'bg-blue-500' },
-    { name: 'Transporte', value: 180, color: 'bg-green-500' },
-    { name: 'Lazer', value: 250, color: 'bg-orange-500' },
-    { name: 'Educação', value: 150, color: 'bg-purple-500' }
-  ];
+  // Calculate summary data
+  const income = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
-  const maxValue = Math.max(...categoryExpenses.map(cat => cat.value));
+  const expenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const balance = income - expenses;
+
+  // Calculate expenses by category
+  const expensesByCategory = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, t) => {
+      const category = t.categories?.name || 'Outros';
+      acc[category] = (acc[category] || 0) + Number(t.amount);
+      return acc;
+    }, {} as Record<string, number>);
+
+  const categoryExpenses = Object.entries(expensesByCategory).map(([name, value], index) => ({
+    name,
+    value,
+    color: ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-purple-500'][index % 5]
+  }));
+
+  const maxValue = Math.max(...categoryExpenses.map(cat => cat.value), 1);
+
+  if (loading) {
+    return <div className="p-6">Carregando relatórios...</div>;
+  }
 
   return (
     <div className="p-6">
@@ -78,7 +141,7 @@ const ReportsPage = () => {
               <span className="text-gray-600">Receitas</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              R$ {summaryData.income.toLocaleString('pt-BR')}
+              R$ {income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
           
@@ -88,7 +151,7 @@ const ReportsPage = () => {
               <span className="text-gray-600">Despesas</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              R$ {summaryData.expenses.toLocaleString('pt-BR')}
+              R$ {expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
           
@@ -98,7 +161,7 @@ const ReportsPage = () => {
               <span className="text-gray-600">Saldo</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              R$ {summaryData.balance.toLocaleString('pt-BR')}
+              R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
         </div>
@@ -108,24 +171,30 @@ const ReportsPage = () => {
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Despesas por Categoria</h2>
         
         <div className="space-y-4">
-          {categoryExpenses.map((category, index) => (
-            <div key={index} className="flex items-center justify-between">
-              <div className="flex items-center flex-1">
-                <span className="text-gray-700 w-24">{category.name}</span>
-                <div className="flex-1 mx-4">
-                  <div className="w-full bg-gray-200 rounded-full h-4">
-                    <div 
-                      className={`${category.color} h-4 rounded-full`}
-                      style={{ width: `${(category.value / maxValue) * 100}%` }}
-                    ></div>
+          {categoryExpenses.length > 0 ? (
+            categoryExpenses.map((category, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <div className="flex items-center flex-1">
+                  <span className="text-gray-700 w-24">{category.name}</span>
+                  <div className="flex-1 mx-4">
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                      <div 
+                        className={`${category.color} h-4 rounded-full`}
+                        style={{ width: `${(category.value / maxValue) * 100}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
+                <span className="text-gray-900 font-medium text-right w-20">
+                  R$ {category.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
               </div>
-              <span className="text-gray-900 font-medium text-right w-20">
-                R$ {category.value.toLocaleString('pt-BR')}
-              </span>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>Nenhuma despesa encontrada</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

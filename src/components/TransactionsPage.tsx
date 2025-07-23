@@ -1,13 +1,30 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Filter, X } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from './ui/use-toast';
 import AddTransactionModal from './AddTransactionModal';
 
+interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  categories: { name: string } | null;
+  accounts: { name: string } | null;
+}
+
 const TransactionsPage = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  // Estados dos filtros
   const [filters, setFilters] = useState({
     category: '',
     paymentMethod: '',
@@ -17,47 +34,66 @@ const TransactionsPage = () => {
     search: ''
   });
 
-  const transactions = [
-    { date: '2024-11-28', description: 'Salário Mensal', category: 'Salário', value: 3500, type: 'income', account: 'Conta Corrente' },
-    { date: '2024-11-27', description: 'Compras Supermercado', category: 'Alimentação', value: -120, type: 'expense', account: 'Cartão de Crédito' },
-    { date: '2024-11-26', description: 'Mensalidade Academia', category: 'Saúde', value: -80, type: 'expense', account: 'Conta Corrente' },
-    { date: '2024-11-25', description: 'Venda de Livro Usado', category: 'Outros', value: 50, type: 'income', account: 'Carteira' },
-    { date: '2024-11-24', description: 'Conta de Luz', category: 'Moradia', value: -150, type: 'expense', account: 'Conta Corrente' },
-  ];
+  useEffect(() => {
+    if (user) {
+      fetchTransactions();
+    }
+  }, [user]);
 
-  // Listas para os filtros
-  const categories = [...new Set(transactions.map(t => t.category))];
-  const paymentMethods = [...new Set(transactions.map(t => t.account))];
+  const fetchTransactions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(`
+          id,
+          date,
+          description,
+          amount,
+          type,
+          categories(name),
+          accounts(name)
+        `)
+        .order('date', { ascending: false });
 
-  // Função para filtrar transações
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar transações",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const categories = [...new Set(transactions.map(t => t.categories?.name).filter(Boolean))];
+  const paymentMethods = [...new Set(transactions.map(t => t.accounts?.name).filter(Boolean))];
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
-      // Filtro por busca
       if (filters.search && !transaction.description.toLowerCase().includes(filters.search.toLowerCase())) {
         return false;
       }
       
-      // Filtro por categoria
-      if (filters.category && transaction.category !== filters.category) {
+      if (filters.category && transaction.categories?.name !== filters.category) {
         return false;
       }
       
-      // Filtro por método de pagamento
-      if (filters.paymentMethod && transaction.account !== filters.paymentMethod) {
+      if (filters.paymentMethod && transaction.accounts?.name !== filters.paymentMethod) {
         return false;
       }
       
-      // Filtro por tipo
       if (filters.type && transaction.type !== filters.type) {
         return false;
       }
       
-      // Filtro por data inicial
       if (filters.startDate && transaction.date < filters.startDate) {
         return false;
       }
       
-      // Filtro por data final
       if (filters.endDate && transaction.date > filters.endDate) {
         return false;
       }
@@ -66,7 +102,6 @@ const TransactionsPage = () => {
     });
   }, [transactions, filters]);
 
-  // Função para limpar filtros
   const clearFilters = () => {
     setFilters({
       category: '',
@@ -78,18 +113,19 @@ const TransactionsPage = () => {
     });
   };
 
-  // Função para atualizar filtros
   const updateFilter = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  if (loading) {
+    return <div className="p-6">Carregando transações...</div>;
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Header - Mobile First */}
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 lg:mt-0 mt-2">Transações</h1>
         
-        {/* Botões - Stack em mobile, lado a lado em desktop */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <button 
             onClick={() => setShowIncomeModal(true)}
@@ -108,14 +144,11 @@ const TransactionsPage = () => {
         </div>
       </div>
 
-      {/* Container das Transações */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-b border-gray-200">
-          {/* Header da seção - Mobile First */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Transações</h3>
             
-            {/* Botões de filtro - Stack em mobile */}
             <div className="flex flex-col sm:flex-row gap-2">
               <button 
                 onClick={() => setShowFilters(!showFilters)}
@@ -136,15 +169,11 @@ const TransactionsPage = () => {
             </div>
           </div>
 
-          {/* Painel de Filtros - Mobile First */}
           {showFilters && (
             <div className="bg-gray-50 p-3 sm:p-4 rounded-lg mb-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {/* Busca */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Buscar
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
                   <input 
                     type="text" 
                     placeholder="Descrição da transação..." 
@@ -154,11 +183,8 @@ const TransactionsPage = () => {
                   />
                 </div>
 
-                {/* Categoria */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoria
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
                   <select 
                     value={filters.category}
                     onChange={(e) => updateFilter('category', e.target.value)}
@@ -171,11 +197,8 @@ const TransactionsPage = () => {
                   </select>
                 </div>
 
-                {/* Método de Pagamento */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Método de Pagamento
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pagamento</label>
                   <select 
                     value={filters.paymentMethod}
                     onChange={(e) => updateFilter('paymentMethod', e.target.value)}
@@ -188,11 +211,8 @@ const TransactionsPage = () => {
                   </select>
                 </div>
 
-                {/* Tipo */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                   <select 
                     value={filters.type}
                     onChange={(e) => updateFilter('type', e.target.value)}
@@ -204,11 +224,8 @@ const TransactionsPage = () => {
                   </select>
                 </div>
 
-                {/* Data Inicial */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data Inicial
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
                   <input 
                     type="date" 
                     value={filters.startDate}
@@ -217,11 +234,8 @@ const TransactionsPage = () => {
                   />
                 </div>
 
-                {/* Data Final */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data Final
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
                   <input 
                     type="date" 
                     value={filters.endDate}
@@ -233,7 +247,6 @@ const TransactionsPage = () => {
             </div>
           )}
 
-          {/* Resumo dos filtros ativos */}
           {(filters.category || filters.paymentMethod || filters.type || filters.startDate || filters.endDate || filters.search) && (
             <div className="mb-4">
               <p className="text-sm text-gray-600">
@@ -251,9 +264,8 @@ const TransactionsPage = () => {
                 <p>Nenhuma transação encontrada</p>
               </div>
             ) : (
-              filteredTransactions.map((transaction, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  {/* Header do card com valor e tipo */}
+              filteredTransactions.map((transaction) => (
+                <div key={transaction.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900 text-sm sm:text-base">
@@ -267,7 +279,7 @@ const TransactionsPage = () => {
                       <span className={`text-base sm:text-lg font-semibold ${
                         transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {transaction.type === 'income' ? '+' : ''} R$ {Math.abs(transaction.value).toLocaleString('pt-BR')}
+                        {transaction.type === 'income' ? '+' : '-'} R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                       <div className="mt-1">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -281,15 +293,14 @@ const TransactionsPage = () => {
                     </div>
                   </div>
                   
-                  {/* Detalhes do card */}
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <span className="text-gray-500">Categoria:</span>
-                      <p className="font-medium text-gray-900">{transaction.category}</p>
+                      <p className="font-medium text-gray-900">{transaction.categories?.name || 'N/A'}</p>
                     </div>
                     <div>
                       <span className="text-gray-500">Método:</span>
-                      <p className="font-medium text-gray-900">{transaction.account}</p>
+                      <p className="font-medium text-gray-900">{transaction.accounts?.name || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
@@ -319,8 +330,8 @@ const TransactionsPage = () => {
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((transaction, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
+                filteredTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(transaction.date).toLocaleDateString('pt-BR')}
                     </td>
@@ -328,10 +339,10 @@ const TransactionsPage = () => {
                       {transaction.description}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {transaction.category}
+                      {transaction.categories?.name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {transaction.account}
+                      {transaction.accounts?.name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -344,7 +355,7 @@ const TransactionsPage = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                        {transaction.type === 'income' ? '+' : ''} R$ {Math.abs(transaction.value).toLocaleString('pt-BR')}
+                        {transaction.type === 'income' ? '+' : '-'} R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </td>
                   </tr>
@@ -353,19 +364,18 @@ const TransactionsPage = () => {
             </tbody>
           </table>
         </div>
-        
-
       </div>
 
-      {/* Modais */}
       <AddTransactionModal 
         isOpen={showIncomeModal}
         onClose={() => setShowIncomeModal(false)}
+        onSuccess={fetchTransactions}
         type="income"
       />
       <AddTransactionModal 
         isOpen={showExpenseModal}
         onClose={() => setShowExpenseModal(false)}
+        onSuccess={fetchTransactions}
         type="expense"
       />
     </div>

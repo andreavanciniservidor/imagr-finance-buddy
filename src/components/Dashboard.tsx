@@ -1,38 +1,121 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, TrendingUp, TrendingDown, DollarSign, Target } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import AddTransactionModal from './AddTransactionModal';
+import { useToast } from './ui/use-toast';
+
+interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  categories: { name: string } | null;
+  accounts: { name: string } | null;
+}
+
+interface Budget {
+  id: string;
+  name: string;
+  amount: number;
+  categories: { name: string } | null;
+}
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const currentDate = new Date().toLocaleDateString('pt-BR', { 
     month: 'long', 
     year: 'numeric' 
   });
 
-  const transactions = [
-    { date: '28 Nov', description: 'Salário Mensal', category: 'Salário', value: 3500, type: 'income', account: 'Conta Corrente' },
-    { date: '27 Nov', description: 'Compras Supermercado', category: 'Alimentação', value: -120, type: 'expense', account: 'Cartão de Crédito' },
-    { date: '26 Nov', description: 'Mensalidade Academia', category: 'Saúde', value: -80, type: 'expense', account: 'Conta Corrente' },
-    { date: '25 Nov', description: 'Venda de Livro Usado', category: 'Outros', value: 50, type: 'income', account: 'Carteira' },
-    { date: '24 Nov', description: 'Conta de Luz', category: 'Moradia', value: -150, type: 'expense', account: 'Conta Corrente' },
-  ];
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
-  const budgets = [
-    { name: 'Alimentação', spent: 450, budget: 400, color: 'bg-red-500', status: 'Estourado' },
-    { name: 'Transporte', spent: 200, budget: 500, color: 'bg-green-500', status: 'No Prazo' },
-    { name: 'Lazer', spent: 150, budget: 200, color: 'bg-orange-500', status: 'Atenção' },
-  ];
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Fetch transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from('transactions')
+        .select(`
+          id,
+          date,
+          description,
+          amount,
+          type,
+          categories(name),
+          accounts(name)
+        `)
+        .order('date', { ascending: false })
+        .limit(5);
 
-  const categories = [
-    { name: 'Alimentação', value: 450 },
-    { name: 'Transporte', value: 200 },
-    { name: 'Moradia', value: 600 },
-    { name: 'Lazer', value: 150 },
-    { name: 'Educação', value: 100 },
-  ];
+      if (transactionsError) throw transactionsError;
+
+      // Fetch budgets
+      const { data: budgetsData, error: budgetsError } = await supabase
+        .from('budgets')
+        .select(`
+          id,
+          name,
+          amount,
+          categories(name)
+        `);
+
+      if (budgetsError) throw budgetsError;
+
+      setTransactions(transactionsData || []);
+      setBudgets(budgetsData || []);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate totals
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const totalExpenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const balance = totalIncome - totalExpenses;
+
+  // Calculate expenses by category
+  const expensesByCategory = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, t) => {
+      const category = t.categories?.name || 'Outros';
+      acc[category] = (acc[category] || 0) + Number(t.amount);
+      return acc;
+    }, {} as Record<string, number>);
+
+  const categories = Object.entries(expensesByCategory).map(([name, value]) => ({
+    name,
+    value
+  }));
+
+  if (loading) {
+    return <div className="p-6">Carregando...</div>;
+  }
 
   return (
     <div className="p-6">
@@ -43,7 +126,9 @@ const Dashboard = () => {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-600">SALDO ATUAL</p>
-          <p className="text-2xl font-bold text-gray-900">R$ 5.200,00</p>
+          <p className="text-2xl font-bold text-gray-900">
+            R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
         </div>
       </div>
 
@@ -54,7 +139,9 @@ const Dashboard = () => {
             <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
             <div>
               <p className="text-sm text-gray-600">Receita</p>
-              <p className="text-xl font-bold text-gray-900">R$ 3.500,00</p>
+              <p className="text-xl font-bold text-gray-900">
+                R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
             </div>
           </div>
         </div>
@@ -64,7 +151,9 @@ const Dashboard = () => {
             <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
             <div>
               <p className="text-sm text-gray-600">Despesas</p>
-              <p className="text-xl font-bold text-gray-900">R$ 1.200,00</p>
+              <p className="text-xl font-bold text-gray-900">
+                R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
             </div>
           </div>
         </div>
@@ -73,8 +162,8 @@ const Dashboard = () => {
           <div className="flex items-center">
             <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
             <div>
-              <p className="text-sm text-gray-600">Gasto</p>
-              <p className="text-xl font-bold text-gray-900">R$ 1.000,00</p>
+              <p className="text-sm text-gray-600">Transações</p>
+              <p className="text-xl font-bold text-gray-900">{transactions.length}</p>
             </div>
           </div>
         </div>
@@ -83,8 +172,8 @@ const Dashboard = () => {
           <div className="flex items-center">
             <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
             <div>
-              <p className="text-sm text-gray-600">Meta</p>
-              <p className="text-xl font-bold text-gray-900">R$ 500,00</p>
+              <p className="text-sm text-gray-600">Orçamentos</p>
+              <p className="text-xl font-bold text-gray-900">{budgets.length}</p>
             </div>
           </div>
         </div>
@@ -95,41 +184,42 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Gastos por Categoria</h3>
           <div className="space-y-3">
-            {categories.map((category, index) => (
-              <div key={index} className="flex justify-between items-center">
-                <span className="text-gray-700">{category.name}</span>
-                <span className="text-gray-900 font-medium">R$ {category.value}</span>
-              </div>
-            ))}
+            {categories.length > 0 ? (
+              categories.map((category, index) => (
+                <div key={index} className="flex justify-between items-center">
+                  <span className="text-gray-700">{category.name}</span>
+                  <span className="text-gray-900 font-medium">
+                    R$ {category.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500">Nenhuma despesa encontrada</p>
+            )}
           </div>
         </div>
 
-        {/* Progresso dos Orçamentos */}
+        {/* Orçamentos */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Progresso dos Orçamentos</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Orçamentos</h3>
           <div className="space-y-4">
-            {budgets.map((budget, index) => (
-              <div key={index}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-700">{budget.name}</span>
-                  <span className="text-gray-900 font-medium">
-                    R$ {budget.spent} / R$ {budget.budget}
-                  </span>
+            {budgets.length > 0 ? (
+              budgets.map((budget, index) => (
+                <div key={index}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-700">{budget.name}</span>
+                    <span className="text-gray-900 font-medium">
+                      R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '50%' }}></div>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`${budget.color} h-2 rounded-full`} 
-                    style={{ width: `${Math.min((budget.spent / budget.budget) * 100, 100)}%` }}
-                  ></div>
-                </div>
-                <p className={`text-xs mt-1 ${
-                  budget.status === 'Estourado' ? 'text-red-600' : 
-                  budget.status === 'Atenção' ? 'text-orange-600' : 'text-green-600'
-                }`}>
-                  {budget.status} em R$ {Math.abs(budget.budget - budget.spent)}
-                </p>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-gray-500">Nenhum orçamento criado</p>
+            )}
           </div>
         </div>
       </div>
@@ -138,19 +228,7 @@ const Dashboard = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <h3 className="text-lg font-semibold text-gray-900">Transações Recentes</h3>
-              <div className="flex items-center space-x-2">
-                <input 
-                  type="text" 
-                  placeholder="Buscar transações..." 
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-                />
-                <button className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm">
-                  Filtrar
-                </button>
-              </div>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Transações Recentes</h3>
             <button className="text-blue-500 text-sm hover:text-blue-600">
               Ver Todas as Transações
             </button>
@@ -169,27 +247,35 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {transactions.map((transaction, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {transaction.date}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {transaction.description}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {transaction.category}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                      {transaction.type === 'income' ? '+' : ''} R$ {Math.abs(transaction.value).toLocaleString('pt-BR')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {transaction.account}
+              {transactions.length > 0 ? (
+                transactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.description}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {transaction.categories?.name || 'Outros'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                        {transaction.type === 'income' ? '+' : '-'} R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {transaction.accounts?.name || 'N/A'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                    Nenhuma transação encontrada
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -216,11 +302,13 @@ const Dashboard = () => {
       <AddTransactionModal 
         isOpen={showIncomeModal}
         onClose={() => setShowIncomeModal(false)}
+        onSuccess={fetchData}
         type="income"
       />
       <AddTransactionModal 
         isOpen={showExpenseModal}
         onClose={() => setShowExpenseModal(false)}
+        onSuccess={fetchData}
         type="expense"
       />
     </div>
