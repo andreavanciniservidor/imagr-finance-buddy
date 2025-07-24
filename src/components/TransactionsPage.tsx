@@ -1,10 +1,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Filter, X } from 'lucide-react';
+import { Plus, Filter, X, ChevronLeft, ChevronRight, Edit, Trash2, MoreHorizontal } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { Button } from './ui/button';
 import AddTransactionModal from './AddTransactionModal';
+import EditTransactionModal from './EditTransactionModal';
 
 interface Transaction {
   id: string;
@@ -12,6 +16,8 @@ interface Transaction {
   description: string;
   amount: number;
   type: 'income' | 'expense';
+  category_id: string | null;
+  account_id: string | null;
   categories: { name: string } | null;
   accounts: { name: string } | null;
 }
@@ -21,9 +27,12 @@ const TransactionsPage = () => {
   const { toast } = useToast();
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   
   const [filters, setFilters] = useState({
     category: '',
@@ -51,9 +60,12 @@ const TransactionsPage = () => {
           description,
           amount,
           type,
+          category_id,
+          account_id,
           categories(name),
           accounts(name)
         `)
+        .eq('user_id', user.id)
         .order('date', { ascending: false });
 
       if (error) throw error;
@@ -81,6 +93,16 @@ const TransactionsPage = () => {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
+      // Filtro por mês atual
+      const transactionDate = new Date(transaction.date);
+      const currentYear = currentMonth.getFullYear();
+      const currentMonthIndex = currentMonth.getMonth();
+      
+      if (transactionDate.getFullYear() !== currentYear || 
+          transactionDate.getMonth() !== currentMonthIndex) {
+        return false;
+      }
+      
       if (filters.search && !transaction.description.toLowerCase().includes(filters.search.toLowerCase())) {
         return false;
       }
@@ -107,7 +129,7 @@ const TransactionsPage = () => {
       
       return true;
     });
-  }, [transactions, filters]);
+  }, [transactions, filters, currentMonth]);
 
   const clearFilters = () => {
     setFilters({
@@ -124,6 +146,69 @@ const TransactionsPage = () => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  const goToPreviousMonth = () => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() - 1);
+      return newDate;
+    });
+  };
+
+  const goToNextMonth = () => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() + 1);
+      return newDate;
+    });
+  };
+
+  const goToCurrentMonth = () => {
+    setCurrentMonth(new Date());
+  };
+
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleDateString('pt-BR', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
+
+  const isCurrentMonth = () => {
+    const now = new Date();
+    return currentMonth.getFullYear() === now.getFullYear() && 
+           currentMonth.getMonth() === now.getMonth();
+  };
+
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteTransaction = async (transactionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', transactionId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Transação excluída com sucesso!",
+      });
+
+      fetchTransactions();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir transação",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return <div className="p-6">Carregando transações...</div>;
   }
@@ -132,6 +217,41 @@ const TransactionsPage = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 lg:mt-0 mt-2">Transações</h1>
+        
+        {/* Navegação por Mês */}
+        <div className="flex items-center justify-center mb-4">
+          <div className="flex items-center space-x-4 bg-white rounded-lg border border-gray-200 px-4 py-2 shadow-sm">
+            <button
+              onClick={goToPreviousMonth}
+              className="p-1 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+              title="Mês anterior"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center space-x-2">
+              <span className="text-lg font-semibold text-gray-900 min-w-[180px] text-center">
+                {formatMonthYear(currentMonth)}
+              </span>
+              {!isCurrentMonth() && (
+                <button
+                  onClick={goToCurrentMonth}
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                >
+                  Hoje
+                </button>
+              )}
+            </div>
+            
+            <button
+              onClick={goToNextMonth}
+              className="p-1 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+              title="Próximo mês"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
         
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <button 
@@ -300,7 +420,7 @@ const TransactionsPage = () => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
                     <div>
                       <span className="text-gray-500">Categoria:</span>
                       <p className="font-medium text-gray-900">{transaction.categories?.name || 'N/A'}</p>
@@ -309,6 +429,48 @@ const TransactionsPage = () => {
                       <span className="text-gray-500">Método:</span>
                       <p className="font-medium text-gray-900">{transaction.accounts?.name || 'N/A'}</p>
                     </div>
+                  </div>
+                  
+                  {/* Botões de Ação Mobile */}
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-gray-200">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditTransaction(transaction)}
+                      className="flex items-center"
+                    >
+                      <Edit className="w-3 h-3 mr-1" />
+                      Editar
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Excluir
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja excluir a transação "{transaction.description}"? Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))
@@ -327,12 +489,13 @@ const TransactionsPage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método de Pagamento</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     Nenhuma transação encontrada
                   </td>
                 </tr>
@@ -365,6 +528,46 @@ const TransactionsPage = () => {
                         {transaction.type === 'income' ? '+' : '-'} R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditTransaction(transaction)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja excluir a transação "{transaction.description}"? Esta ação não pode ser desfeita.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteTransaction(transaction.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 ))
               )}
@@ -384,6 +587,15 @@ const TransactionsPage = () => {
         onClose={() => setShowExpenseModal(false)}
         onSuccess={fetchTransactions}
         type="expense"
+      />
+      <EditTransactionModal 
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingTransaction(null);
+        }}
+        onSuccess={fetchTransactions}
+        transaction={editingTransaction}
       />
     </div>
   );

@@ -139,11 +139,12 @@ const BudgetPage = () => {
 
       if (budgetsError) throw budgetsError;
 
-      // Fetch categories
+      // Fetch categories (only user-created categories, not pre-defined ones)
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
         .select('id, name')
-        .eq('type', 'expense');
+        .eq('type', 'expense')
+        .eq('user_id', user?.id);
 
       if (categoriesError) throw categoriesError;
 
