@@ -1,6 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { 
   LayoutDashboard, 
   Target, 
@@ -24,6 +26,17 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // O redirecionamento será tratado automaticamente pelo listener de auth state
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
+
   return (
     <div className="flex h-screen w-64 flex-col bg-white border-r border-gray-200">
       <div className="flex h-16 items-center px-6 border-b border-gray-200">
@@ -55,10 +68,31 @@ const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
           <HelpCircle className="mr-3 h-5 w-5 flex-shrink-0" />
           Ajuda
         </button>
-        <button className="group flex w-full items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900">
-          <LogOut className="mr-3 h-5 w-5 flex-shrink-0" />
-          Sair
-        </button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button className="group flex w-full items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors">
+              <LogOut className="mr-3 h-5 w-5 flex-shrink-0" />
+              Sair
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Saída</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja sair da aplicação? Você precisará fazer login novamente para acessar suas informações financeiras.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleSignOut}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Sair
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

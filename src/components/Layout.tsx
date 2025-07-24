@@ -11,7 +11,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Mobile header with menu button */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center justify-between px-4 py-3">
@@ -52,16 +52,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       )}
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:flex lg:flex-shrink-0">
-        <Sidebar />
-      </div>
+      {/* Main layout container */}
+      <div className="lg:flex lg:h-screen">
+        {/* Desktop sidebar - only visible on large screens */}
+        <div className="hidden lg:flex lg:flex-shrink-0">
+          <Sidebar />
+        </div>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto lg:ml-0">
-        <div className="lg:hidden h-16" /> {/* Spacer for mobile menu button */}
-        {children}
-      </main>
+        {/* Main content area */}
+        <main className="flex-1 lg:overflow-y-auto min-h-screen lg:min-h-0">
+          {/* Spacer for mobile header - only on mobile */}
+          <div className="lg:hidden h-16" />
+          
+          {/* Content wrapper */}
+          <div className="w-full h-full">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
