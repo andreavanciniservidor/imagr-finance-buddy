@@ -366,7 +366,7 @@ const BudgetPage = () => {
                 <span className="sm:hidden">Novo Orçamento</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Criar Novo Orçamento</DialogTitle>
               </DialogHeader>
@@ -469,7 +469,7 @@ const BudgetPage = () => {
 
         {/* Modal de Edição */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Editar Orçamento</DialogTitle>
             </DialogHeader>

@@ -17,7 +17,9 @@ const ReportsPage = () => {
   const [period, setPeriod] = useState('Mês Atual');
   const [reportType, setReportType] = useState('Despesas por Categoria');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportGenerated, setReportGenerated] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -36,7 +38,8 @@ const ReportsPage = () => {
           amount,
           type,
           categories(name)
-        `);
+        `)
+        .eq('user_id', user?.id);
 
       if (error) throw error;
       
@@ -47,6 +50,7 @@ const ReportsPage = () => {
       }));
       
       setTransactions(typedTransactions);
+      setFilteredTransactions(typedTransactions); // Initialize with all transactions
     } catch (error) {
       toast({
         title: "Erro",
@@ -58,19 +62,69 @@ const ReportsPage = () => {
     }
   };
 
-  // Calculate summary data
-  const income = transactions
+  const getDateRange = (period: string) => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = new Date(now);
+
+    switch (period) {
+      case 'Mês Atual':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        break;
+      case 'Último Mês':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'Último Trimestre':
+        const quarterStart = Math.floor(now.getMonth() / 3) * 3 - 3;
+        startDate = new Date(now.getFullYear(), quarterStart, 1);
+        endDate = new Date(now.getFullYear(), quarterStart + 3, 0);
+        break;
+      case 'Último Ano':
+        startDate = new Date(now.getFullYear() - 1, 0, 1);
+        endDate = new Date(now.getFullYear() - 1, 11, 31);
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+
+    return { startDate, endDate };
+  };
+
+  const generateReport = () => {
+    const { startDate, endDate } = getDateRange(period);
+    
+    const filtered = transactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      return transactionDate >= startDate && transactionDate <= endDate;
+    });
+
+    setFilteredTransactions(filtered);
+    setReportGenerated(true);
+    
+    toast({
+      title: "Sucesso",
+      description: `Relatório gerado para ${period.toLowerCase()}`,
+    });
+  };
+
+  // Calculate summary data based on filtered transactions
+  const dataToUse = reportGenerated ? filteredTransactions : transactions;
+  
+  const income = dataToUse
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
-  const expenses = transactions
+  const expenses = dataToUse
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = income - expenses;
 
   // Calculate expenses by category
-  const expensesByCategory = transactions
+  const expensesByCategory = dataToUse
     .filter(t => t.type === 'expense')
     .reduce((acc, t) => {
       const category = t.categories?.name || 'Outros';
@@ -85,6 +139,217 @@ const ReportsPage = () => {
   }));
 
   const maxValue = Math.max(...categoryExpenses.map(cat => cat.value), 1);
+
+  // Calculate monthly evolution data
+  const getMonthlyEvolution = () => {
+    const monthlyData: Record<string, { income: number; expenses: number }> = {};
+    
+    dataToUse.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { income: 0, expenses: 0 };
+      }
+      
+      if (transaction.type === 'income') {
+        monthlyData[monthKey].income += Number(transaction.amount);
+      } else {
+        monthlyData[monthKey].expenses += Number(transaction.amount);
+      }
+    });
+
+    return Object.entries(monthlyData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, data]) => ({
+        month: new Date(month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
+        ...data,
+        balance: data.income - data.expenses
+      }));
+  };
+
+  const monthlyEvolution = getMonthlyEvolution();
+  const maxMonthlyValue = Math.max(
+    ...monthlyEvolution.flatMap(m => [m.income, m.expenses]),
+    1
+  );
+
+  const renderReportContent = () => {
+    switch (reportType) {
+      case 'Receitas vs Despesas':
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Receitas vs Despesas</h2>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-green-500 rounded-full mr-3"></div>
+                  <span className="text-gray-700 font-medium">Receitas</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-green-600">
+                    R$ {income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-red-500 rounded-full mr-3"></div>
+                  <span className="text-gray-700 font-medium">Despesas</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-red-600">
+                    R$ {expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-blue-500 rounded-full mr-3"></div>
+                  <span className="text-gray-700 font-medium">Saldo Final</span>
+                </div>
+                <div className="text-right">
+                  <p className={`text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Visual comparison */}
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-gray-900 mb-4">Comparação Visual</h3>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-sm text-gray-600 mb-1">
+                      <span>Receitas</span>
+                      <span>{income > 0 ? ((income / (income + expenses)) * 100).toFixed(1) : 0}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-green-500 h-3 rounded-full"
+                        style={{ width: income > 0 ? `${(income / (income + expenses)) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-sm text-gray-600 mb-1">
+                      <span>Despesas</span>
+                      <span>{expenses > 0 ? ((expenses / (income + expenses)) * 100).toFixed(1) : 0}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-red-500 h-3 rounded-full"
+                        style={{ width: expenses > 0 ? `${(expenses / (income + expenses)) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Evolução Mensal':
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Evolução Mensal</h2>
+            <div className="space-y-4">
+              {monthlyEvolution.length > 0 ? (
+                monthlyEvolution.map((month, index) => (
+                  <div key={index} className="border-b border-gray-100 pb-4 last:border-b-0">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-medium text-gray-900">{month.month}</h4>
+                      <span className={`font-bold ${month.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        Saldo: R$ {month.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                          <span className="text-sm text-gray-600">Receitas</span>
+                        </div>
+                        <span className="text-sm font-medium">
+                          R$ {month.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-green-500 h-2 rounded-full"
+                          style={{ width: `${(month.income / maxMonthlyValue) * 100}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                          <span className="text-sm text-gray-600">Despesas</span>
+                        </div>
+                        <span className="text-sm font-medium">
+                          R$ {month.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-red-500 h-2 rounded-full"
+                          style={{ width: `${(month.expenses / maxMonthlyValue) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Nenhum dado encontrado para o período selecionado</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      default: // Despesas por Categoria
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Despesas por Categoria</h2>
+            <div className="space-y-4">
+              {categoryExpenses.length > 0 ? (
+                categoryExpenses.map((category, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center flex-1">
+                      <span className="text-gray-700 w-24">{category.name}</span>
+                      <div className="flex-1 mx-4">
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div 
+                            className={`${category.color} h-4 rounded-full transition-all duration-300`}
+                            style={{ width: `${(category.value / maxValue) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-gray-900 font-medium">
+                        R$ {category.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <div className="text-xs text-gray-500">
+                        {((category.value / expenses) * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Nenhuma despesa encontrada para o período selecionado</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+    }
+  };
 
   if (loading) {
     return <div className="p-6">Carregando relatórios...</div>;
@@ -130,7 +395,10 @@ const ReportsPage = () => {
           </div>
 
           <div className="flex items-end">
-            <button className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+            <button 
+              onClick={generateReport}
+              className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+            >
               Gerar Relatório
             </button>
           </div>
@@ -173,36 +441,20 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Despesas por Categoria</h2>
-        
-        <div className="space-y-4">
-          {categoryExpenses.length > 0 ? (
-            categoryExpenses.map((category, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center flex-1">
-                  <span className="text-gray-700 w-24">{category.name}</span>
-                  <div className="flex-1 mx-4">
-                    <div className="w-full bg-gray-200 rounded-full h-4">
-                      <div 
-                        className={`${category.color} h-4 rounded-full`}
-                        style={{ width: `${(category.value / maxValue) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-                <span className="text-gray-900 font-medium text-right w-20">
-                  R$ {category.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>Nenhuma despesa encontrada</p>
-            </div>
-          )}
+      {/* Indicador de status do relatório */}
+      {reportGenerated && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+            <span className="text-blue-800 font-medium">
+              Relatório gerado para: {period} - {reportType}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Conteúdo dinâmico do relatório */}
+      {renderReportContent()}
     </div>
   );
 };
