@@ -17,11 +17,6 @@ interface Category {
   name: string;
 }
 
-interface Account {
-  id: string;
-  name: string;
-}
-
 const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -32,12 +27,21 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  
+  // Métodos de pagamento fixos
+  const paymentMethods = [
+    { id: 'credit_card', name: 'Cartão de Crédito' },
+    { id: 'debit_card', name: 'Cartão de Débito' },
+    { id: 'pix', name: 'Pix' },
+    { id: 'cash', name: 'Dinheiro' },
+    { id: 'transfer', name: 'Transferência' }
+  ];
+
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
     category_id: '',
-    account_id: '',
+    payment_method: 'credit_card',
     date: new Date().toISOString().split('T')[0],
     transactionType: type,
     isRecurring: false,
@@ -51,7 +55,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
-      fetchAccounts();
+      // Definir parcelamento como true por padrão para cartão de crédito
+      setShowInstallments(formData.payment_method === 'credit_card');
     }
   }, [isOpen, type]);
 
@@ -75,22 +80,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   };
 
-  const fetchAccounts = async () => {
-    const { data, error } = await supabase
-      .from('accounts')
-      .select('id, name');
-
-    if (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar contas",
-        variant: "destructive"
-      });
-    } else {
-      setAccounts(data || []);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -98,10 +87,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     setLoading(true);
     try {
       // Verificar se é cartão de crédito e tem parcelamento
-      const isCreditCard = formData.account_id === "" || // Opção padrão "Cartão de Crédito"
-        accounts.find(acc => acc.id === formData.account_id)?.name.toLowerCase().includes('cartão') ||
-        accounts.find(acc => acc.id === formData.account_id)?.name.toLowerCase().includes('crédito');
-
+      const isCreditCard = formData.payment_method === 'credit_card';
       const isInstallment = isCreditCard && showInstallments && formData.installments > 1;
 
       if (isInstallment) {
@@ -124,7 +110,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             amount: parseFloat(formData.amount),
             description: installmentDescription,
             category_id: formData.category_id || null,
-            account_id: formData.account_id || null,
+            account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
+            payment_method: formData.payment_method,
             date: installmentDate.toISOString().split('T')[0],
             type: formData.transactionType
           });
@@ -154,7 +141,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           amount: parseFloat(formData.amount),
           description: formData.description,
           category_id: formData.category_id || null,
-          account_id: formData.account_id || null,
+          account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
+          payment_method: formData.payment_method,
           date: transactionDate,
           type: formData.transactionType
         });
@@ -173,7 +161,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         amount: '',
         description: '',
         category_id: '',
-        account_id: '',
+        payment_method: 'credit_card',
         date: new Date().toISOString().split('T')[0],
         transactionType: type,
         isRecurring: false,
@@ -310,24 +298,16 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             <div className="relative">
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                value={formData.account_id}
+                value={formData.payment_method}
                 onChange={(e) => {
-                  setFormData({ ...formData, account_id: e.target.value });
-                  // Mostrar seção de parcelamento se for cartão de crédito
-                  if (e.target.value === "") {
-                    // Opção padrão "Cartão de Crédito" selecionada
-                    setShowInstallments(true);
-                  } else {
-                    const selectedAccount = accounts.find(acc => acc.id === e.target.value);
-                    setShowInstallments(selectedAccount?.name.toLowerCase().includes('cartão') || 
-                                      selectedAccount?.name.toLowerCase().includes('crédito') || false);
-                  }
+                  setFormData({ ...formData, payment_method: e.target.value });
+                  // Mostrar seção de parcelamento apenas se for cartão de crédito
+                  setShowInstallments(e.target.value === 'credit_card');
                 }}
               >
-                <option value="">Cartão de Crédito</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
+                {paymentMethods.map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
                   </option>
                 ))}
               </select>

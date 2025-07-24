@@ -51,3 +51,7 @@ ADD COLUMN IF NOT EXISTS alert_threshold INTEGER DEFAULT 80 CHECK (alert_thresho
 
 -- Atualizar orçamentos existentes com threshold padrão de 80%
 UPDATE public.budgets SET alert_threshold = 80 WHERE alert_threshold IS NULL;
+
+-- 6. Adicionar coluna payment_method na tabela transactions
+ALTER TABLE public.transactions 
+ADD COLUMN IF NOT EXISTS payment_method TEXT;

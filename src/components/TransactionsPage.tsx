@@ -18,6 +18,7 @@ interface Transaction {
   type: 'income' | 'expense';
   category_id: string | null;
   account_id: string | null;
+  payment_method?: string;
   categories: { name: string } | null;
   accounts: { name: string } | null;
 }
@@ -33,6 +34,22 @@ const TransactionsPage = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Métodos de pagamento fixos (mesmo do modal)
+  const paymentMethods = [
+    { id: 'credit_card', name: 'Cartão de Crédito' },
+    { id: 'debit_card', name: 'Cartão de Débito' },
+    { id: 'pix', name: 'Pix' },
+    { id: 'cash', name: 'Dinheiro' },
+    { id: 'transfer', name: 'Transferência' }
+  ];
+
+  // Função para converter ID do método para nome legível
+  const getPaymentMethodName = (paymentMethodId: string | null | undefined) => {
+    if (!paymentMethodId) return 'N/A';
+    const method = paymentMethods.find(m => m.id === paymentMethodId);
+    return method ? method.name : 'N/A';
+  };
   
   const [filters, setFilters] = useState({
     category: '',
@@ -62,6 +79,7 @@ const TransactionsPage = () => {
           type,
           category_id,
           account_id,
+          payment_method,
           categories(name),
           accounts(name)
         `)
@@ -89,7 +107,7 @@ const TransactionsPage = () => {
   };
 
   const categories = [...new Set(transactions.map(t => t.categories?.name).filter(Boolean))];
-  const paymentMethods = [...new Set(transactions.map(t => t.accounts?.name).filter(Boolean))];
+  const paymentMethodsForFilter = paymentMethods.map(pm => pm.name);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
@@ -111,7 +129,7 @@ const TransactionsPage = () => {
         return false;
       }
       
-      if (filters.paymentMethod && transaction.accounts?.name !== filters.paymentMethod) {
+      if (filters.paymentMethod && getPaymentMethodName(transaction.payment_method) !== filters.paymentMethod) {
         return false;
       }
       
@@ -332,7 +350,7 @@ const TransactionsPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Todos os métodos</option>
-                    {paymentMethods.map(method => (
+                    {paymentMethodsForFilter.map(method => (
                       <option key={method} value={method}>{method}</option>
                     ))}
                   </select>
@@ -427,7 +445,7 @@ const TransactionsPage = () => {
                     </div>
                     <div>
                       <span className="text-gray-500">Método:</span>
-                      <p className="font-medium text-gray-900">{transaction.accounts?.name || 'N/A'}</p>
+                      <p className="font-medium text-gray-900">{getPaymentMethodName(transaction.payment_method)}</p>
                     </div>
                   </div>
                   
@@ -512,7 +530,7 @@ const TransactionsPage = () => {
                       {transaction.categories?.name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {transaction.accounts?.name || 'N/A'}
+                      {getPaymentMethodName(transaction.payment_method)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
