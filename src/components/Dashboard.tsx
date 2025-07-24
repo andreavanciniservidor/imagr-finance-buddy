@@ -19,6 +19,9 @@ interface Budget {
   id: string;
   name: string;
   amount: number;
+  period: string;
+  category_id: string | null;
+  alert_threshold: number;
   categories: { name: string } | null;
 }
 
@@ -29,6 +32,7 @@ const Dashboard = () => {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [budgetSpending, setBudgetSpending] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   const currentDate = new Date().toLocaleDateString('pt-BR', { 
@@ -41,6 +45,86 @@ const Dashboard = () => {
       fetchData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (budgets.length > 0) {
+      fetchBudgetSpending();
+    }
+  }, [budgets]);
+
+  const fetchBudgetSpending = async () => {
+    if (!user || budgets.length === 0) return;
+
+    try {
+      const spendingData: Record<string, number> = {};
+      const currentMonth = new Date();
+      
+      for (const budget of budgets) {
+        if (!budget.category_id) continue;
+
+        // Calculate date range based on budget period and current month
+        let startDate: Date;
+        let endDate: Date;
+        
+        switch (budget.period) {
+          case 'weekly':
+            // For weekly budgets, use the current week of the selected month
+            startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), currentMonth.getDate() - 7);
+            endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), currentMonth.getDate());
+            break;
+          case 'monthly':
+            // For monthly budgets, use the selected month
+            startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+            endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+            break;
+          case 'quarterly':
+            // For quarterly budgets, use the quarter of the selected month
+            const quarterStart = Math.floor(currentMonth.getMonth() / 3) * 3;
+            startDate = new Date(currentMonth.getFullYear(), quarterStart, 1);
+            endDate = new Date(currentMonth.getFullYear(), quarterStart + 3, 0);
+            break;
+          case 'yearly':
+            // For yearly budgets, use the year of the selected month
+            startDate = new Date(currentMonth.getFullYear(), 0, 1);
+            endDate = new Date(currentMonth.getFullYear(), 11, 31);
+            break;
+          default:
+            startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+            endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+        }
+
+        // Fetch transactions for this category and period
+        const { data: transactions, error } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('category_id', budget.category_id)
+          .eq('type', 'expense')
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0]);
+
+        if (error) throw error;
+
+        const totalSpent = transactions?.reduce((sum, transaction) => sum + Number(transaction.amount), 0) || 0;
+        spendingData[budget.id] = totalSpent;
+      }
+
+      setBudgetSpending(spendingData);
+    } catch (error) {
+      console.error('Error fetching budget spending:', error);
+    }
+  };
+
+  const getBudgetProgress = (budget: Budget) => {
+    const spent = budgetSpending[budget.id] || 0;
+    const percentage = (spent / budget.amount) * 100;
+    return {
+      spent,
+      percentage: Math.min(percentage, 100),
+      isOverBudget: percentage > 100,
+      isNearLimit: percentage >= budget.alert_threshold
+    };
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -69,6 +153,9 @@ const Dashboard = () => {
           id,
           name,
           amount,
+          period,
+          category_id,
+          alert_threshold,
           categories(name)
         `);
 
@@ -209,19 +296,38 @@ const Dashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Orçamentos</h3>
           <div className="space-y-4">
             {budgets.length > 0 ? (
-              budgets.map((budget, index) => (
-                <div key={index}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-700">{budget.name}</span>
-                    <span className="text-gray-900 font-medium">
-                      R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
+              budgets.map((budget) => {
+                const progress = getBudgetProgress(budget);
+                return (
+                  <div key={budget.id}>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-700">{budget.name}</span>
+                      <div className="text-right">
+                        <span className="text-gray-900 font-medium text-sm">
+                          R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / 
+                          R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          progress.isOverBudget 
+                            ? 'bg-red-500' 
+                            : progress.isNearLimit 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(progress.percentage, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-gray-500">
+                      <span>{progress.percentage.toFixed(1)}% usado</span>
+                      <span className="capitalize">{budget.period}</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '50%' }}></div>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <p className="text-gray-500">Nenhum orçamento criado</p>
             )}
