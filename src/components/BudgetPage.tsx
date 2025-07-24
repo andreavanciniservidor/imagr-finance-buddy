@@ -196,14 +196,15 @@ const BudgetPage = () => {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Orçamentos</h1>
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center">
+            <Button className="flex items-center justify-center w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
-              Criar Novo Orçamento
+              <span className="hidden sm:inline">Criar Novo Orçamento</span>
+              <span className="sm:hidden">Novo Orçamento</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
@@ -365,17 +366,25 @@ const BudgetPage = () => {
         </Dialog>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Orçamentos Ativos</h2>
 
         <div className="space-y-6">
           {budgets.length > 0 ? (
             budgets.map((budget) => (
               <div key={budget.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-lg font-medium text-gray-900">{budget.name}</h3>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">{budget.name}</h3>
+                    <div className="flex flex-col sm:hidden">
+                      <p className="text-xl font-bold text-gray-900">
+                        R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-sm text-gray-500 capitalize">{budget.period}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end space-x-4">
+                    <div className="text-right hidden sm:block">
                       <p className="text-lg font-bold text-gray-900">
                         R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>

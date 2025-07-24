@@ -12,14 +12,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-0 left-0 z-50 p-4">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm border border-gray-200"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
+      {/* Mobile header with menu button */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900">Finanças+</h1>
+          <div className="w-10" /> {/* Spacer for balance */}
+        </div>
       </div>
 
       {/* Mobile sidebar overlay */}
