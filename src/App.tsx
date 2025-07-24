@@ -8,7 +8,7 @@ import Dashboard from "@/components/Dashboard";
 import TransactionsPage from "@/components/TransactionsPage";
 import BudgetPage from "@/components/BudgetPage";
 import ReportsPage from "@/components/ReportsPage";
-import SettingsPage from "@/components/SettingsPage";
+import CategoriesPage from "@/components/CategoriesPage";
 import ComingSoon from "@/components/ComingSoon";
 import AuthPage from "@/components/AuthPage";
 
@@ -39,7 +39,7 @@ function AppContent() {
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/budget" element={<BudgetPage />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/goals" element={<ComingSoon title="Metas" />} />
         <Route path="/investments" element={<ComingSoon title="Investimentos" />} />
         <Route path="/cards" element={<ComingSoon title="Cartões" />} />

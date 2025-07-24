@@ -6,7 +6,7 @@ import {
   Target, 
   ArrowLeftRight, 
   FileText, 
-  Settings,
+  Tag,
   HelpCircle,
   LogOut
 } from 'lucide-react';
@@ -15,8 +15,8 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Orçamento Doméstico', href: '/budget', icon: Target },
   { name: 'Transações', href: '/transactions', icon: ArrowLeftRight },
+  { name: 'Categorias', href: '/categories', icon: Tag },
   { name: 'Relatórios', href: '/reports', icon: FileText },
-  { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 
 interface SidebarProps {
