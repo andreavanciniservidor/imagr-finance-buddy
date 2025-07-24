@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Bell, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
@@ -10,6 +10,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Slider } from './ui/slider';
 
 interface Budget {
   id: string;
@@ -17,6 +18,7 @@ interface Budget {
   amount: number;
   period: string;
   category_id: string | null;
+  alert_threshold: number;
   categories: { name: string } | null;
 }
 
@@ -34,11 +36,13 @@ const BudgetPage = () => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [budgetSpending, setBudgetSpending] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
     category_id: '',
-    period: 'monthly'
+    period: 'monthly',
+    alert_threshold: 80
   });
 
   useEffect(() => {
@@ -46,6 +50,76 @@ const BudgetPage = () => {
       fetchData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (budgets.length > 0) {
+      fetchBudgetSpending();
+    }
+  }, [budgets]);
+
+  const fetchBudgetSpending = async () => {
+    if (!user || budgets.length === 0) return;
+
+    try {
+      const spendingData: Record<string, number> = {};
+      
+      for (const budget of budgets) {
+        if (!budget.category_id) continue;
+
+        // Calculate date range based on budget period
+        const now = new Date();
+        let startDate: Date;
+        
+        switch (budget.period) {
+          case 'weekly':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+            break;
+          case 'monthly':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          case 'quarterly':
+            const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+            startDate = new Date(now.getFullYear(), quarterStart, 1);
+            break;
+          case 'yearly':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            break;
+          default:
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        }
+
+        // Fetch transactions for this category and period
+        const { data: transactions, error } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('category_id', budget.category_id)
+          .eq('type', 'expense')
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', now.toISOString().split('T')[0]);
+
+        if (error) throw error;
+
+        const totalSpent = transactions?.reduce((sum, transaction) => sum + Number(transaction.amount), 0) || 0;
+        spendingData[budget.id] = totalSpent;
+      }
+
+      setBudgetSpending(spendingData);
+    } catch (error) {
+      console.error('Error fetching budget spending:', error);
+    }
+  };
+
+  const getBudgetProgress = (budget: Budget) => {
+    const spent = budgetSpending[budget.id] || 0;
+    const percentage = (spent / budget.amount) * 100;
+    return {
+      spent,
+      percentage: Math.min(percentage, 100),
+      isOverBudget: percentage > 100,
+      isNearLimit: percentage >= budget.alert_threshold
+    };
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -59,6 +133,7 @@ const BudgetPage = () => {
           amount,
           period,
           category_id,
+          alert_threshold,
           categories(name)
         `);
 
@@ -99,7 +174,8 @@ const BudgetPage = () => {
         name: formData.name,
         amount: parseFloat(formData.amount),
         category_id: formData.category_id || null,
-        period: formData.period
+        period: formData.period,
+        alert_threshold: formData.alert_threshold
       });
 
       if (error) throw error;
@@ -110,7 +186,7 @@ const BudgetPage = () => {
       });
 
       setIsModalOpen(false);
-      setFormData({ name: '', amount: '', category_id: '', period: 'monthly' });
+      setFormData({ name: '', amount: '', category_id: '', period: 'monthly', alert_threshold: 80 });
       fetchData();
     } catch (error) {
       toast({
@@ -127,7 +203,8 @@ const BudgetPage = () => {
       name: budget.name,
       amount: budget.amount.toString(),
       category_id: budget.category_id || '',
-      period: budget.period
+      period: budget.period,
+      alert_threshold: budget.alert_threshold || 80
     });
     setIsEditModalOpen(true);
   };
@@ -143,7 +220,8 @@ const BudgetPage = () => {
           name: formData.name,
           amount: parseFloat(formData.amount),
           category_id: formData.category_id || null,
-          period: formData.period
+          period: formData.period,
+          alert_threshold: formData.alert_threshold
         })
         .eq('id', editingBudget.id);
 
@@ -156,7 +234,7 @@ const BudgetPage = () => {
 
       setIsEditModalOpen(false);
       setEditingBudget(null);
-      setFormData({ name: '', amount: '', category_id: '', period: 'monthly' });
+      setFormData({ name: '', amount: '', category_id: '', period: 'monthly', alert_threshold: 80 });
       fetchData();
     } catch (error) {
       toast({
@@ -267,6 +345,30 @@ const BudgetPage = () => {
                 </Select>
               </div>
 
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Bell className="w-4 h-4 text-blue-600" />
+                  <Label className="text-sm font-medium">Notificações de Limite</Label>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Alerta quando atingir:</span>
+                    <span className="text-sm font-medium text-blue-600">{formData.alert_threshold}%</span>
+                  </div>
+                  <Slider
+                    value={[formData.alert_threshold]}
+                    onValueChange={(value) => handleInputChange('alert_threshold', value[0].toString())}
+                    max={100}
+                    min={10}
+                    step={5}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Você receberá uma notificação quando o gasto atingir esta porcentagem do orçamento.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-2 pt-4">
                 <Button
                   type="button"
@@ -345,6 +447,30 @@ const BudgetPage = () => {
                 </Select>
               </div>
 
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Bell className="w-4 h-4 text-blue-600" />
+                  <Label className="text-sm font-medium">Notificações de Limite</Label>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Alerta quando atingir:</span>
+                    <span className="text-sm font-medium text-blue-600">{formData.alert_threshold}%</span>
+                  </div>
+                  <Slider
+                    value={[formData.alert_threshold]}
+                    onValueChange={(value) => handleInputChange('alert_threshold', value[0].toString())}
+                    max={100}
+                    min={10}
+                    step={5}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Você receberá uma notificação quando o gasto atingir esta porcentagem do orçamento.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-2 pt-4">
                 <Button
                   type="button"
@@ -352,7 +478,7 @@ const BudgetPage = () => {
                   onClick={() => {
                     setIsEditModalOpen(false);
                     setEditingBudget(null);
-                    setFormData({ name: '', amount: '', category_id: '', period: 'monthly' });
+                    setFormData({ name: '', amount: '', category_id: '', period: 'monthly', alert_threshold: 80 });
                   }}
                 >
                   Cancelar
@@ -431,18 +557,109 @@ const BudgetPage = () => {
                   </div>
                 </div>
 
-                <div className="mb-2">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Categoria: {budget.categories?.name || 'N/A'}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div className="bg-blue-500 h-3 rounded-full" style={{ width: '0%' }}></div>
-                  </div>
-                </div>
+                {(() => {
+                  const progress = getBudgetProgress(budget);
+                  return (
+                    <>
+                      <div className="mb-4">
+                        <div className="flex justify-between text-sm text-gray-600 mb-2">
+                          <span>Categoria: {budget.categories?.name || 'N/A'}</span>
+                          <span>
+                            R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / 
+                            R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        
+                        <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                          <div 
+                            className={`h-3 rounded-full transition-all duration-300 ${
+                              progress.isOverBudget 
+                                ? 'bg-red-500' 
+                                : progress.isNearLimit 
+                                  ? 'bg-yellow-500' 
+                                  : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(progress.percentage, 100)}%` }}
+                          />
+                        </div>
+                        
+                        <div className="flex justify-between items-center text-xs text-gray-500">
+                          <span>{progress.percentage.toFixed(1)}% usado</span>
+                          <span>Alerta: {budget.alert_threshold}%</span>
+                        </div>
+                      </div>
 
-                <p className="text-sm font-medium text-green-600">
-                  Orçamento criado
-                </p>
+                      {/* Status e Alertas */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {progress.isOverBudget ? (
+                            <>
+                              <AlertTriangle className="w-4 h-4 text-red-500" />
+                              <span className="text-sm font-medium text-red-600">
+                                Orçamento excedido
+                              </span>
+                            </>
+                          ) : progress.isNearLimit ? (
+                            <>
+                              <Bell className="w-4 h-4 text-yellow-500" />
+                              <span className="text-sm font-medium text-yellow-600">
+                                Próximo do limite
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-medium text-green-600">
+                              Dentro do orçamento
+                            </span>
+                          )}
+                        </div>
+                        
+                        {progress.isNearLimit && (
+                          <div className="flex items-center space-x-1 text-xs text-gray-500">
+                            <Bell className="w-3 h-3" />
+                            <span>Alerta ativo</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Alerta de Limite */}
+                      {progress.isNearLimit && !progress.isOverBudget && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <div className="flex items-start space-x-2">
+                            <Bell className="w-4 h-4 text-yellow-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-yellow-800">
+                                Notificação de Limite
+                              </p>
+                              <p className="text-xs text-yellow-700 mt-1">
+                                Você atingiu {progress.percentage.toFixed(1)}% do seu orçamento. 
+                                Restam R$ {(budget.amount - progress.spent).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
+                                para este período.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Alerta de Orçamento Excedido */}
+                      {progress.isOverBudget && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-start space-x-2">
+                            <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-red-800">
+                                Orçamento Excedido
+                              </p>
+                              <p className="text-xs text-red-700 mt-1">
+                                Você excedeu seu orçamento em R$ {(progress.spent - budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. 
+                                Considere revisar seus gastos nesta categoria.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             ))
           ) : (

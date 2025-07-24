@@ -6,9 +6,13 @@ ALTER TABLE public.categories
 ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users,
 ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#3B82F6';
 
--- 2. Remover políticas RLS antigas
+-- 2. Remover políticas RLS antigas e novas (para recriar)
 DROP POLICY IF EXISTS "Categories are viewable by everyone" ON public.categories;
 DROP POLICY IF EXISTS "Categories are insertable by everyone" ON public.categories;
+DROP POLICY IF EXISTS "Users can view their own categories and default categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can create their own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can update their own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can delete their own categories" ON public.categories;
 
 -- 3. Criar novas políticas RLS para categorias específicas por usuário
 CREATE POLICY "Users can view their own categories and default categories" 
@@ -40,3 +44,10 @@ UPDATE public.categories SET color = '#10B981' WHERE name = 'Educação' AND typ
 UPDATE public.categories SET color = '#06B6D4' WHERE name = 'Saúde' AND type = 'expense';
 UPDATE public.categories SET color = '#8B5CF6' WHERE name = 'Vestuário' AND type = 'expense';
 UPDATE public.categories SET color = '#6B7280' WHERE name = 'Outros' AND type = 'expense';
+
+-- 5. Adicionar coluna de alerta de limite na tabela budgets
+ALTER TABLE public.budgets 
+ADD COLUMN IF NOT EXISTS alert_threshold INTEGER DEFAULT 80 CHECK (alert_threshold >= 0 AND alert_threshold <= 100);
+
+-- Atualizar orçamentos existentes com threshold padrão de 80%
+UPDATE public.budgets SET alert_threshold = 80 WHERE alert_threshold IS NULL;
