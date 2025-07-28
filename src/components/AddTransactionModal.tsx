@@ -93,12 +93,19 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       if (isInstallment) {
         // Criar múltiplas transações para parcelamento
         const transactions = [];
-        const baseDate = new Date(formData.date);
+        const [year, month, day] = formData.date.split('-').map(Number);
+        const baseDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
         
         for (let i = 0; i < formData.installments; i++) {
           // Calcular a data de cada parcela (começando no mês seguinte)
           const installmentDate = new Date(baseDate);
           installmentDate.setMonth(baseDate.getMonth() + 1 + i);
+          
+          // Formatar data manualmente para evitar problemas de fuso horário
+          const installmentYear = installmentDate.getFullYear();
+          const installmentMonth = String(installmentDate.getMonth() + 1).padStart(2, '0');
+          const installmentDay = String(installmentDate.getDate()).padStart(2, '0');
+          const formattedDate = `${installmentYear}-${installmentMonth}-${installmentDay}`;
           
           // Ajustar descrição para incluir número da parcela
           const installmentDescription = formData.installments > 1 
@@ -112,7 +119,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             category_id: formData.category_id || null,
             account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
             payment_method: formData.payment_method,
-            date: installmentDate.toISOString().split('T')[0],
+            date: formattedDate,
             type: formData.transactionType
           });
         }
@@ -131,9 +138,16 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         
         // Se for cartão de crédito (mesmo sem parcelamento), lançar no mês seguinte
         if (isCreditCard) {
-          const date = new Date(formData.date);
+          // Criar data local para evitar problemas de fuso horário
+          const [year, month, day] = formData.date.split('-').map(Number);
+          const date = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
           date.setMonth(date.getMonth() + 1);
-          transactionDate = date.toISOString().split('T')[0];
+          
+          // Formatar data manualmente para evitar problemas de fuso horário
+          const newYear = date.getFullYear();
+          const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+          const newDay = String(date.getDate()).padStart(2, '0');
+          transactionDate = `${newYear}-${newMonth}-${newDay}`;
         }
 
         const { error } = await supabase.from('transactions').insert({
@@ -394,8 +408,18 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               {formData.installments > 1 && (
                 <div className="text-xs text-gray-600 space-y-1">
                   <p>• Serão geradas {formData.installments} parcelas de R$ {formData.amount}</p>
-                  <p>• Primeira parcela em {new Date(new Date(formData.date).setMonth(new Date(formData.date).getMonth() + 1)).toLocaleDateString('pt-BR')}</p>
-                  <p>• Última parcela em {new Date(new Date(formData.date).setMonth(new Date(formData.date).getMonth() + formData.installments)).toLocaleDateString('pt-BR')}</p>
+                  <p>• Primeira parcela em {(() => {
+                    const [year, month, day] = formData.date.split('-').map(Number);
+                    const date = new Date(year, month - 1, day);
+                    date.setMonth(date.getMonth() + 1);
+                    return date.toLocaleDateString('pt-BR');
+                  })()}</p>
+                  <p>• Última parcela em {(() => {
+                    const [year, month, day] = formData.date.split('-').map(Number);
+                    const date = new Date(year, month - 1, day);
+                    date.setMonth(date.getMonth() + formData.installments);
+                    return date.toLocaleDateString('pt-BR');
+                  })()}</p>
                   <div className="bg-yellow-200 text-yellow-800 p-2 rounded mt-2">
                     <strong>Nota:</strong> Em compras parceladas, a primeira parcela é lançada para o mês seguinte.
                   </div>
