@@ -129,8 +129,8 @@ const Dashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch transactions
-      const { data: transactionsData, error: transactionsError } = await supabase
+      // Fetch ALL transactions for calculations (not limited)
+      const { data: allTransactionsData, error: allTransactionsError } = await supabase
         .from('transactions')
         .select(`
           id,
@@ -141,10 +141,10 @@ const Dashboard = () => {
           categories(name),
           accounts(name)
         `)
-        .order('date', { ascending: false })
-        .limit(5);
+        .eq('user_id', user?.id)
+        .order('date', { ascending: false });
 
-      if (transactionsError) throw transactionsError;
+      if (allTransactionsError) throw allTransactionsError;
 
       // Fetch budgets
       const { data: budgetsData, error: budgetsError } = await supabase
@@ -157,12 +157,13 @@ const Dashboard = () => {
           category_id,
           alert_threshold,
           categories(name)
-        `);
+        `)
+        .eq('user_id', user?.id);
 
       if (budgetsError) throw budgetsError;
 
       // Type assertion for transactions to ensure proper typing
-      const typedTransactions = (transactionsData || []).map(t => ({
+      const typedTransactions = (allTransactionsData || []).map(t => ({
         ...t,
         type: t.type as 'income' | 'expense'
       }));
@@ -170,6 +171,7 @@ const Dashboard = () => {
       setTransactions(typedTransactions);
       setBudgets(budgetsData || []);
     } catch (error) {
+      console.error('Error fetching data:', error);
       toast({
         title: "Erro",
         description: "Erro ao carregar dados",
@@ -359,7 +361,7 @@ const Dashboard = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {transactions.length > 0 ? (
-                transactions.map((transaction) => (
+                transactions.slice(0, 5).map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(transaction.date).toLocaleDateString('pt-BR')}
