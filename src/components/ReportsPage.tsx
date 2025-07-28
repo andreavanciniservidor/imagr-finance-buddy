@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import Papa from 'papaparse';
+import { Download, FileText, FileSpreadsheet } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -20,6 +24,7 @@ const ReportsPage = () => {
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportGenerated, setReportGenerated] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -42,13 +47,13 @@ const ReportsPage = () => {
         .eq('user_id', user?.id);
 
       if (error) throw error;
-      
+
       // Type assertion for transactions to ensure proper typing
       const typedTransactions = (data || []).map(t => ({
         ...t,
         type: t.type as 'income' | 'expense'
       }));
-      
+
       setTransactions(typedTransactions);
       setFilteredTransactions(typedTransactions); // Initialize with all transactions
     } catch (error) {
@@ -95,7 +100,7 @@ const ReportsPage = () => {
 
   const generateReport = () => {
     const { startDate, endDate } = getDateRange(period);
-    
+
     const filtered = transactions.filter(transaction => {
       const transactionDate = new Date(transaction.date);
       return transactionDate >= startDate && transactionDate <= endDate;
@@ -103,16 +108,132 @@ const ReportsPage = () => {
 
     setFilteredTransactions(filtered);
     setReportGenerated(true);
-    
+
     toast({
       title: "Sucesso",
       description: `Relatório gerado para ${period.toLowerCase()}`,
     });
   };
 
+  const exportToCSV = () => {
+    if (!reportGenerated) {
+      toast({
+        title: "Erro",
+        description: "Gere um relatório primeiro antes de exportar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    let csvData: any[] = [];
+    const fileName = `relatorio_${reportType.toLowerCase().replace(/\s+/g, '_')}_${period.toLowerCase().replace(/\s+/g, '_')}.csv`;
+
+    switch (reportType) {
+      case 'Despesas por Categoria':
+        csvData = categoryExpenses.map(cat => ({
+          'Categoria': cat.name,
+          'Valor (R$)': cat.value.toFixed(2),
+          'Percentual (%)': ((cat.value / expenses) * 100).toFixed(1)
+        }));
+        break;
+
+      case 'Receitas vs Despesas':
+        csvData = [
+          { 'Tipo': 'Receitas', 'Valor (R$)': income.toFixed(2) },
+          { 'Tipo': 'Despesas', 'Valor (R$)': expenses.toFixed(2) },
+          { 'Tipo': 'Saldo Final', 'Valor (R$)': balance.toFixed(2) }
+        ];
+        break;
+
+      case 'Evolução Mensal':
+        csvData = monthlyEvolution.map(month => ({
+          'Mês': month.month,
+          'Receitas (R$)': month.income.toFixed(2),
+          'Despesas (R$)': month.expenses.toFixed(2),
+          'Saldo (R$)': month.balance.toFixed(2)
+        }));
+        break;
+    }
+
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    toast({
+      title: "Sucesso",
+      description: "Relatório CSV baixado com sucesso!",
+    });
+  };
+
+  const exportToPDF = async () => {
+    if (!reportGenerated || !reportRef.current) {
+      toast({
+        title: "Erro",
+        description: "Gere um relatório primeiro antes de exportar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+
+      // Adicionar título
+      pdf.setFontSize(16);
+      pdf.text(`Relatório Financeiro - ${reportType}`, 20, 20);
+      pdf.setFontSize(12);
+      pdf.text(`Período: ${period}`, 20, 30);
+      pdf.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 20, 40);
+
+      // Adicionar resumo
+      pdf.text(`Receitas: R$ ${income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 55);
+      pdf.text(`Despesas: R$ ${expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 65);
+      pdf.text(`Saldo: R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 75);
+
+      // Calcular dimensões da imagem
+      const imgWidth = 170;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      // Adicionar imagem do relatório
+      pdf.addImage(imgData, 'PNG', 20, 85, imgWidth, imgHeight);
+
+      const fileName = `relatorio_${reportType.toLowerCase().replace(/\s+/g, '_')}_${period.toLowerCase().replace(/\s+/g, '_')}.pdf`;
+      pdf.save(fileName);
+
+      toast({
+        title: "Sucesso",
+        description: "Relatório PDF baixado com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar PDF. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Calculate summary data based on filtered transactions
   const dataToUse = reportGenerated ? filteredTransactions : transactions;
-  
+
   const income = dataToUse
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -143,15 +264,15 @@ const ReportsPage = () => {
   // Calculate monthly evolution data
   const getMonthlyEvolution = () => {
     const monthlyData: Record<string, { income: number; expenses: number }> = {};
-    
+
     dataToUse.forEach(transaction => {
       const date = new Date(transaction.date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
+
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = { income: 0, expenses: 0 };
       }
-      
+
       if (transaction.type === 'income') {
         monthlyData[monthKey].income += Number(transaction.amount);
       } else {
@@ -192,7 +313,7 @@ const ReportsPage = () => {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
                 <div className="flex items-center">
                   <div className="w-4 h-4 bg-red-500 rounded-full mr-3"></div>
@@ -204,7 +325,7 @@ const ReportsPage = () => {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
                 <div className="flex items-center">
                   <div className="w-4 h-4 bg-blue-500 rounded-full mr-3"></div>
@@ -216,7 +337,7 @@ const ReportsPage = () => {
                   </p>
                 </div>
               </div>
-              
+
               {/* Visual comparison */}
               <div className="mt-6">
                 <h3 className="text-md font-medium text-gray-900 mb-4">Comparação Visual</h3>
@@ -227,20 +348,20 @@ const ReportsPage = () => {
                       <span>{income > 0 ? ((income / (income + expenses)) * 100).toFixed(1) : 0}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
+                      <div
                         className="bg-green-500 h-3 rounded-full"
                         style={{ width: income > 0 ? `${(income / (income + expenses)) * 100}%` : '0%' }}
                       />
                     </div>
                   </div>
-                  
+
                   <div>
                     <div className="flex justify-between text-sm text-gray-600 mb-1">
                       <span>Despesas</span>
                       <span>{expenses > 0 ? ((expenses / (income + expenses)) * 100).toFixed(1) : 0}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
+                      <div
                         className="bg-red-500 h-3 rounded-full"
                         style={{ width: expenses > 0 ? `${(expenses / (income + expenses)) * 100}%` : '0%' }}
                       />
@@ -266,7 +387,7 @@ const ReportsPage = () => {
                         Saldo: R$ {month.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -278,12 +399,12 @@ const ReportsPage = () => {
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-green-500 h-2 rounded-full"
                           style={{ width: `${(month.income / maxMonthlyValue) * 100}%` }}
                         />
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
                           <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
@@ -294,7 +415,7 @@ const ReportsPage = () => {
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-red-500 h-2 rounded-full"
                           style={{ width: `${(month.expenses / maxMonthlyValue) * 100}%` }}
                         />
@@ -323,7 +444,7 @@ const ReportsPage = () => {
                       <span className="text-gray-700 w-24">{category.name}</span>
                       <div className="flex-1 mx-4">
                         <div className="w-full bg-gray-200 rounded-full h-4">
-                          <div 
+                          <div
                             className={`${category.color} h-4 rounded-full transition-all duration-300`}
                             style={{ width: `${(category.value / maxValue) * 100}%` }}
                           />
@@ -361,7 +482,7 @@ const ReportsPage = () => {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Filtros de Relatório</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -395,7 +516,7 @@ const ReportsPage = () => {
           </div>
 
           <div className="flex items-end">
-            <button 
+            <button
               onClick={generateReport}
               className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
             >
@@ -407,7 +528,7 @@ const ReportsPage = () => {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Resumo do Período</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center">
             <div className="flex items-center justify-center mb-2">
@@ -418,7 +539,7 @@ const ReportsPage = () => {
               R$ {income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          
+
           <div className="text-center">
             <div className="flex items-center justify-center mb-2">
               <div className="w-4 h-4 bg-red-500 rounded-full mr-2"></div>
@@ -428,7 +549,7 @@ const ReportsPage = () => {
               R$ {expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          
+
           <div className="text-center">
             <div className="flex items-center justify-center mb-2">
               <div className="w-4 h-4 bg-blue-500 rounded-full mr-2"></div>
@@ -441,20 +562,42 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      {/* Indicador de status do relatório */}
+      {/* Indicador de status do relatório e botões de exportação */}
       {reportGenerated && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-            <span className="text-blue-800 font-medium">
-              Relatório gerado para: {period} - {reportType}
-            </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+              <span className="text-blue-800 font-medium">
+                Relatório gerado para: {period} - {reportType}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={exportToCSV}
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors"
+                title="Exportar para CSV"
+              >
+                <FileSpreadsheet size={16} />
+                CSV
+              </button>
+              <button
+                onClick={exportToPDF}
+                className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors"
+                title="Exportar para PDF"
+              >
+                <FileText size={16} />
+                PDF
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Conteúdo dinâmico do relatório */}
-      {renderReportContent()}
+      <div ref={reportRef}>
+        {renderReportContent()}
+      </div>
     </div>
   );
 };
