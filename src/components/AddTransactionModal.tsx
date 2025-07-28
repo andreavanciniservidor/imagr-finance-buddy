@@ -60,23 +60,64 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   }, [isOpen, type]);
 
+  // Adicionar listener para quando o app volta do background (mobile)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isOpen && categories.length === 0) {
+        // App voltou do background e modal está aberto mas sem categorias
+        fetchCategories();
+      }
+    };
+
+    const handleFocus = () => {
+      if (isOpen && categories.length === 0) {
+        // Janela ganhou foco e modal está aberto mas sem categorias
+        fetchCategories();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isOpen, categories.length]);
+
+  // Verificar se as categorias estão vazias quando o tipo muda
+  useEffect(() => {
+    if (isOpen && categories.length === 0) {
+      fetchCategories();
+    }
+  }, [formData.transactionType, isOpen]);
+
   const fetchCategories = async () => {
     if (!user) return;
     
-    const { data, error } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('type', type)
-      .eq('user_id', user.id);
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('type', formData.transactionType)
+        .eq('user_id', user.id);
 
-    if (error) {
+      if (error) throw error;
+      
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
       toast({
         title: "Erro",
         description: "Erro ao carregar categorias",
         variant: "destructive"
       });
-    } else {
-      setCategories(data || []);
+      // Em caso de erro, tentar novamente após um pequeno delay
+      setTimeout(() => {
+        if (isOpen && user) {
+          fetchCategories();
+        }
+      }, 2000);
     }
   };
 
