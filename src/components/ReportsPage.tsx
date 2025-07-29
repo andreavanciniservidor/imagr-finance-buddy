@@ -77,6 +77,10 @@ const ReportsPage = () => {
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         break;
+      case 'Próximo Mês':
+        startDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+        break;
       case 'Último Mês':
         startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         endDate = new Date(now.getFullYear(), now.getMonth(), 0);
@@ -494,6 +498,7 @@ const ReportsPage = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Mês Atual">Mês Atual</option>
+              <option value="Próximo Mês">Próximo Mês</option>
               <option value="Último Ano">Último Ano</option>
               <option value="Último Mês">Último Mês</option>
               <option value="Último Trimestre">Último Trimestre</option>
