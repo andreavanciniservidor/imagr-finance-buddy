@@ -5,6 +5,13 @@ import { useAuth } from '@/hooks/useAuth';
 import AddTransactionModal from './AddTransactionModal';
 import { useToast } from './ui/use-toast';
 
+// Função utilitária para formatar datas sem problemas de fuso horário
+const formatDateForDisplay = (dateString: string) => {
+  const [year, month, day] = dateString.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return date.toLocaleDateString('pt-BR');
+};
+
 interface Transaction {
   id: string;
   date: string;
@@ -500,7 +507,7 @@ const Dashboard = () => {
                 filteredTransactions.slice(0, 5).map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                      {formatDateForDisplay(transaction.date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {transaction.description}

@@ -10,6 +10,13 @@ import { Button } from './ui/button';
 import AddTransactionModal from './AddTransactionModal';
 import EditTransactionModal from './EditTransactionModal';
 
+// Função utilitária para formatar datas sem problemas de fuso horário
+const formatDateForDisplay = (dateString: string) => {
+  const [year, month, day] = dateString.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return date.toLocaleDateString('pt-BR');
+};
+
 interface Transaction {
   id: string;
   date: string;
@@ -417,7 +424,7 @@ const TransactionsPage = () => {
                         {transaction.description}
                       </h4>
                       <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        {formatDateForDisplay(transaction.date)}
                       </p>
                     </div>
                     <div className="text-right ml-3">
@@ -521,7 +528,7 @@ const TransactionsPage = () => {
                 filteredTransactions.map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                      {formatDateForDisplay(transaction.date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {transaction.description}

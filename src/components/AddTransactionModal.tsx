@@ -27,6 +27,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   
   // Métodos de pagamento fixos
   const paymentMethods = [
@@ -37,12 +38,21 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     { id: 'transfer', name: 'Transferência' }
   ];
 
+  // Função para obter data atual no formato correto (sem problemas de fuso horário)
+  const getCurrentDateString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
     category_id: '',
     payment_method: 'credit_card',
-    date: new Date().toISOString().split('T')[0],
+    date: getCurrentDateString(),
     transactionType: type,
     isRecurring: false,
     installments: 1,
@@ -63,39 +73,73 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   // Adicionar listener para quando o app volta do background (mobile)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && isOpen && categories.length === 0) {
+      if (!document.hidden && isOpen && categories.length === 0 && user) {
         // App voltou do background e modal está aberto mas sem categorias
+        console.log('App voltou do background, recarregando categorias...');
         fetchCategories();
       }
     };
 
     const handleFocus = () => {
-      if (isOpen && categories.length === 0) {
+      if (isOpen && categories.length === 0 && user) {
         // Janela ganhou foco e modal está aberto mas sem categorias
+        console.log('Janela ganhou foco, recarregando categorias...');
+        fetchCategories();
+      }
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && isOpen && categories.length === 0 && user) {
+        // Página foi restaurada do cache (mobile)
+        console.log('Página restaurada do cache, recarregando categorias...');
+        fetchCategories();
+      }
+    };
+
+    const handleResume = () => {
+      if (isOpen && categories.length === 0 && user) {
+        // App resumiu (mobile)
+        console.log('App resumiu, recarregando categorias...');
         fetchCategories();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('resume', handleResume);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('resume', handleResume);
     };
-  }, [isOpen, categories.length]);
+  }, [isOpen, categories.length, user]);
 
   // Verificar se as categorias estão vazias quando o tipo muda
   useEffect(() => {
-    if (isOpen && categories.length === 0) {
+    if (isOpen && user) {
       fetchCategories();
     }
-  }, [formData.transactionType, isOpen]);
+  }, [formData.transactionType, isOpen, user]);
 
-  const fetchCategories = async () => {
+  // Forçar re-render quando as categorias são carregadas
+  useEffect(() => {
+    if (categories.length > 0 && formData.category_id === '' && !loadingCategories) {
+      // Força uma atualização do componente para garantir que o select seja re-renderizado
+      setFormData(prev => ({ ...prev, category_id: '' }));
+    }
+  }, [categories.length, loadingCategories]);
+
+  const fetchCategories = async (retryCount = 0) => {
     if (!user) return;
     
+    setLoadingCategories(true);
+    
     try {
+      console.log(`Buscando categorias (tentativa ${retryCount + 1})...`);
+      
       const { data, error } = await supabase
         .from('categories')
         .select('id, name')
@@ -105,19 +149,40 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       if (error) throw error;
       
       setCategories(data || []);
+      console.log(`Categorias carregadas: ${data?.length || 0} encontradas`);
+      
+      // Se não encontrou categorias e é a primeira tentativa, tentar novamente
+      if ((!data || data.length === 0) && retryCount === 0) {
+        console.log('Nenhuma categoria encontrada, tentando novamente...');
+        setTimeout(() => {
+          if (isOpen && user) {
+            fetchCategories(1);
+          }
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar categorias",
-        variant: "destructive"
-      });
-      // Em caso de erro, tentar novamente após um pequeno delay
-      setTimeout(() => {
-        if (isOpen && user) {
-          fetchCategories();
-        }
-      }, 2000);
+      
+      // Só mostrar toast de erro após algumas tentativas
+      if (retryCount >= 2) {
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar categorias",
+          variant: "destructive"
+        });
+      }
+      
+      // Tentar novamente até 3 vezes
+      if (retryCount < 3) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Backoff exponencial
+        setTimeout(() => {
+          if (isOpen && user) {
+            fetchCategories(retryCount + 1);
+          }
+        }, delay);
+      }
+    } finally {
+      setLoadingCategories(false);
     }
   };
 
@@ -217,7 +282,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         description: '',
         category_id: '',
         payment_method: 'credit_card',
-        date: new Date().toISOString().split('T')[0],
+        date: getCurrentDateString(),
         transactionType: type,
         isRecurring: false,
         installments: 1,
@@ -326,14 +391,37 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Categoria
+                {loadingCategories && (
+                  <span className="ml-2 text-xs text-blue-600">(Carregando...)</span>
+                )}
+                {!loadingCategories && categories.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => fetchCategories()}
+                    className="ml-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Recarregar
+                  </button>
+                )}
               </label>
               <div className="relative">
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                  key={`categories-${categories.length}-${formData.transactionType}-${loadingCategories}-${Date.now()}`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${
+                    loadingCategories ? 'bg-gray-50' : 'bg-white'
+                  }`}
                   value={formData.category_id}
                   onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                  disabled={loadingCategories}
                 >
-                  <option value="">Selecione uma categoria</option>
+                  <option value="">
+                    {loadingCategories 
+                      ? 'Carregando categorias...' 
+                      : categories.length === 0 
+                        ? 'Nenhuma categoria encontrada'
+                        : 'Selecione uma categoria'
+                    }
+                  </option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
@@ -342,6 +430,13 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 </select>
                 <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
+              
+              {/* Debug info - remover em produção */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Debug: {categories.length} categorias | Loading: {loadingCategories ? 'Sim' : 'Não'} | Tipo: {formData.transactionType}
+                </div>
+              )}
             </div>
           </div>
 
