@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, TrendingUp, TrendingDown, DollarSign, Target } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import AddTransactionModal from './AddTransactionModal';
@@ -34,11 +34,41 @@ const Dashboard = () => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [budgetSpending, setBudgetSpending] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
 
-  const currentDate = new Date().toLocaleDateString('pt-BR', { 
-    month: 'long', 
-    year: 'numeric' 
-  });
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleDateString('pt-BR', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
+
+  const isCurrentMonth = () => {
+    const now = new Date();
+    return currentMonth.getFullYear() === now.getFullYear() && 
+           currentMonth.getMonth() === now.getMonth();
+  };
+
+  const goToPreviousMonth = () => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() - 1);
+      return newDate;
+    });
+  };
+
+  const goToNextMonth = () => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() + 1);
+      return newDate;
+    });
+  };
+
+  const goToCurrentMonth = () => {
+    setCurrentMonth(new Date());
+  };
 
   useEffect(() => {
     if (user) {
@@ -51,6 +81,76 @@ const Dashboard = () => {
       fetchBudgetSpending();
     }
   }, [budgets]);
+
+  useEffect(() => {
+    filterTransactionsByMonth();
+  }, [transactions, currentMonth]);
+
+  const getDateRange = (period: string) => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = new Date(now);
+
+    switch (period) {
+      case 'current_month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        break;
+      case 'last_month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'current_quarter':
+        const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+        startDate = new Date(now.getFullYear(), quarterStart, 1);
+        endDate = new Date(now.getFullYear(), quarterStart + 3, 0);
+        break;
+      case 'last_quarter':
+        const lastQuarterStart = Math.floor(now.getMonth() / 3) * 3 - 3;
+        if (lastQuarterStart < 0) {
+          startDate = new Date(now.getFullYear() - 1, 9, 1); // Q4 do ano anterior
+          endDate = new Date(now.getFullYear() - 1, 12, 0);
+        } else {
+          startDate = new Date(now.getFullYear(), lastQuarterStart, 1);
+          endDate = new Date(now.getFullYear(), lastQuarterStart + 3, 0);
+        }
+        break;
+      case 'current_year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        endDate = new Date(now.getFullYear(), 11, 31);
+        break;
+      case 'last_year':
+        startDate = new Date(now.getFullYear() - 1, 0, 1);
+        endDate = new Date(now.getFullYear() - 1, 11, 31);
+        break;
+      case 'last_30_days':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        endDate = now;
+        break;
+      case 'last_90_days':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        endDate = now;
+        break;
+      case 'all_time':
+      default:
+        return null; // Retorna null para indicar que não há filtro
+    }
+
+    return { startDate, endDate };
+  };
+
+  const filterTransactionsByMonth = () => {
+    const currentYear = currentMonth.getFullYear();
+    const currentMonthIndex = currentMonth.getMonth();
+    
+    const filtered = transactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      return transactionDate.getFullYear() === currentYear && 
+             transactionDate.getMonth() === currentMonthIndex;
+    });
+
+    setFilteredTransactions(filtered);
+  };
 
   const fetchBudgetSpending = async () => {
     if (!user || budgets.length === 0) return;
@@ -182,19 +282,19 @@ const Dashboard = () => {
     }
   };
 
-  // Calculate totals
-  const totalIncome = transactions
+  // Calculate totals using filtered transactions
+  const totalIncome = filteredTransactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
-  const totalExpenses = transactions
+  const totalExpenses = filteredTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = totalIncome - totalExpenses;
 
-  // Calculate expenses by category
-  const expensesByCategory = transactions
+  // Calculate expenses by category using filtered transactions
+  const expensesByCategory = filteredTransactions
     .filter(t => t.type === 'expense')
     .reduce((acc, t) => {
       const category = t.categories?.name || 'Outros';
@@ -213,16 +313,52 @@ const Dashboard = () => {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 capitalize">{currentDate}</p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-600">SALDO ATUAL</p>
-          <p className="text-2xl font-bold text-gray-900">
-            R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
+        
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          {/* Navegação por Mês */}
+          <div className="flex items-center space-x-4 bg-white rounded-lg border border-gray-200 px-4 py-2 shadow-sm">
+            <button
+              onClick={goToPreviousMonth}
+              className="p-1 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+              title="Mês anterior"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center space-x-2">
+              <span className="text-lg font-semibold text-gray-900 min-w-[180px] text-center">
+                {formatMonthYear(currentMonth)}
+              </span>
+              {!isCurrentMonth() && (
+                <button
+                  onClick={goToCurrentMonth}
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                >
+                  Hoje
+                </button>
+              )}
+            </div>
+            
+            <button
+              onClick={goToNextMonth}
+              className="p-1 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+              title="Próximo mês"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Saldo do Mês */}
+          <div className="text-right">
+            <p className="text-sm text-gray-600">SALDO DO MÊS</p>
+            <p className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -257,7 +393,7 @@ const Dashboard = () => {
             <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
             <div>
               <p className="text-sm text-gray-600">Transações</p>
-              <p className="text-xl font-bold text-gray-900">{transactions.length}</p>
+              <p className="text-xl font-bold text-gray-900">{filteredTransactions.length}</p>
             </div>
           </div>
         </div>
@@ -360,8 +496,8 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {transactions.length > 0 ? (
-                transactions.slice(0, 5).map((transaction) => (
+              {filteredTransactions.length > 0 ? (
+                filteredTransactions.slice(0, 5).map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(transaction.date).toLocaleDateString('pt-BR')}
