@@ -40,7 +40,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   return (
     <div className="flex h-screen w-64 flex-col bg-white border-r border-gray-200">
       <div className="flex h-16 items-center px-6 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">Finanças+</h1>
+        <svg width="160" height="48" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="44" fontWeight="600" fill="#1E293B">
+            Fin <tspan fill="#10B981">Control</tspan>
+          </text>
+        </svg>
       </div>
       
       <nav className="flex-1 space-y-1 px-3 py-4">
@@ -64,10 +68,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
       </nav>
       
       <div className="border-t border-gray-200 p-3 space-y-1">
-        <button className="group flex w-full items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900">
-          <HelpCircle className="mr-3 h-5 w-5 flex-shrink-0" />
-          Ajuda
-        </button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button className="group flex w-full items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors">

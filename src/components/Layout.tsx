@@ -21,7 +21,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <Menu className="h-6 w-6" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">Finanças+</h1>
+          <svg width="120" height="36" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+            <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="44" fontWeight="600" fill="#1E293B">
+              Fin <tspan fill="#10B981">Control</tspan>
+            </text>
+          </svg>
           <div className="w-10" /> {/* Spacer for balance */}
         </div>
       </div>
