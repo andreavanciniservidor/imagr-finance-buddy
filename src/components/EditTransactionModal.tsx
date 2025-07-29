@@ -245,11 +245,13 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                 >
                   <option value="">Selecione uma categoria</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
+                  {categories
+                    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                    .map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>

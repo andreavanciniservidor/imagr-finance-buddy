@@ -42,12 +42,12 @@ const TransactionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Métodos de pagamento fixos (mesmo do modal)
+  // Métodos de pagamento fixos (ordenados alfabeticamente)
   const paymentMethods = [
     { id: 'credit_card', name: 'Cartão de Crédito' },
     { id: 'debit_card', name: 'Cartão de Débito' },
-    { id: 'pix', name: 'Pix' },
     { id: 'cash', name: 'Dinheiro' },
+    { id: 'pix', name: 'Pix' },
     { id: 'transfer', name: 'Transferência' }
   ];
 
@@ -118,13 +118,12 @@ const TransactionsPage = () => {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
-      // Filtro por mês atual
-      const transactionDate = new Date(transaction.date);
+      // Filtro por mês atual (sem problemas de fuso horário)
+      const [year, month, day] = transaction.date.split('-').map(Number);
       const currentYear = currentMonth.getFullYear();
       const currentMonthIndex = currentMonth.getMonth();
       
-      if (transactionDate.getFullYear() !== currentYear || 
-          transactionDate.getMonth() !== currentMonthIndex) {
+      if (year !== currentYear || (month - 1) !== currentMonthIndex) {
         return false;
       }
       
@@ -343,9 +342,11 @@ const TransactionsPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Todas as categorias</option>
-                    {categories.map(category => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
+                    {categories
+                      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+                      .map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
                   </select>
                 </div>
 

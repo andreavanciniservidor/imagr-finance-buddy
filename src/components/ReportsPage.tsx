@@ -494,9 +494,9 @@ const ReportsPage = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Mês Atual">Mês Atual</option>
+              <option value="Último Ano">Último Ano</option>
               <option value="Último Mês">Último Mês</option>
               <option value="Último Trimestre">Último Trimestre</option>
-              <option value="Último Ano">Último Ano</option>
             </select>
           </div>
 
@@ -510,8 +510,8 @@ const ReportsPage = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Despesas por Categoria">Despesas por Categoria</option>
-              <option value="Receitas vs Despesas">Receitas vs Despesas</option>
               <option value="Evolução Mensal">Evolução Mensal</option>
+              <option value="Receitas vs Despesas">Receitas vs Despesas</option>
             </select>
           </div>
 

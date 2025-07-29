@@ -29,12 +29,12 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   
-  // Métodos de pagamento fixos
+  // Métodos de pagamento fixos (ordenados alfabeticamente)
   const paymentMethods = [
     { id: 'credit_card', name: 'Cartão de Crédito' },
     { id: 'debit_card', name: 'Cartão de Débito' },
-    { id: 'pix', name: 'Pix' },
     { id: 'cash', name: 'Dinheiro' },
+    { id: 'pix', name: 'Pix' },
     { id: 'transfer', name: 'Transferência' }
   ];
 
@@ -242,7 +242,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         // Transação única
         let transactionDate = formData.date;
         
-        // Se for cartão de crédito (mesmo sem parcelamento), lançar no mês seguinte
+        // Se for cartão de crédito, lançar no mês seguinte (independente de parcelamento)
         if (isCreditCard) {
           // Criar data local para evitar problemas de fuso horário
           const [year, month, day] = formData.date.split('-').map(Number);
@@ -422,21 +422,17 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                         : 'Selecione uma categoria'
                     }
                   </option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
+                  {categories
+                    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                    .map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
-              
-              {/* Debug info - remover em produção */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Debug: {categories.length} categorias | Loading: {loadingCategories ? 'Sim' : 'Não'} | Tipo: {formData.transactionType}
-                </div>
-              )}
+
             </div>
           </div>
 

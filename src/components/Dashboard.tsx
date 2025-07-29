@@ -151,9 +151,9 @@ const Dashboard = () => {
     const currentMonthIndex = currentMonth.getMonth();
     
     const filtered = transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date);
-      return transactionDate.getFullYear() === currentYear && 
-             transactionDate.getMonth() === currentMonthIndex;
+      // Filtro por mês sem problemas de fuso horário
+      const [year, month, day] = transaction.date.split('-').map(Number);
+      return year === currentYear && (month - 1) === currentMonthIndex;
     });
 
     setFilteredTransactions(filtered);
@@ -298,6 +298,11 @@ const Dashboard = () => {
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
+  // Calculate total installments (parcelas) for the month
+  const totalInstallments = filteredTransactions
+    .filter(t => t.description.includes('(') && t.description.includes('/') && t.description.includes(')'))
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
   const balance = totalIncome - totalExpenses;
 
   // Calculate expenses by category using filtered transactions
@@ -399,8 +404,10 @@ const Dashboard = () => {
           <div className="flex items-center">
             <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
             <div>
-              <p className="text-sm text-gray-600">Transações</p>
-              <p className="text-xl font-bold text-gray-900">{filteredTransactions.length}</p>
+              <p className="text-sm text-gray-600">Total Parcelado</p>
+              <p className="text-xl font-bold text-gray-900">
+                R$ {totalInstallments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
             </div>
           </div>
         </div>
