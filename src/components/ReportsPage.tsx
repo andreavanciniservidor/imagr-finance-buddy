@@ -21,6 +21,7 @@ interface Transaction {
   amount: number;
   type: 'income' | 'expense';
   categories: { name: string } | null;
+  payment_method: string;
 }
 
 const ReportsPage = () => {
@@ -31,7 +32,7 @@ const ReportsPage = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reportGenerated, setReportGenerated] = useState(false);
+  const [reportGenerated, setReportGenerated] = useState(true);
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,6 +40,22 @@ const ReportsPage = () => {
       fetchTransactions();
     }
   }, [user]);
+
+  // Auto-generate report when period or reportType changes
+  useEffect(() => {
+    if (transactions.length > 0) {
+      const { startDate, endDate } = getDateRange(period);
+
+      const filtered = transactions.filter(transaction => {
+        // Parse manual da data para evitar problemas de fuso horário
+        const [year, month, day] = transaction.date.split('-').map(Number);
+        const transactionDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
+        return transactionDate >= startDate && transactionDate <= endDate;
+      });
+
+      setFilteredTransactions(filtered);
+    }
+  }, [transactions, period, reportType]);
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -51,6 +68,7 @@ const ReportsPage = () => {
           description,
           amount,
           type,
+          payment_method,
           categories(name)
         `)
         .eq('user_id', user?.id);
@@ -170,6 +188,14 @@ const ReportsPage = () => {
         }));
         break;
 
+      case 'Método de Pagamento':
+        csvData = paymentMethodExpenses.map(pm => ({
+          'Método de Pagamento': pm.name,
+          'Valor (R$)': pm.value.toFixed(2),
+          'Percentual (%)': ((pm.value / expenses) * 100).toFixed(1)
+        }));
+        break;
+
       case 'Transações do Mês':
         csvData = filteredTransactions.map(transaction => ({
           'Data': formatDateForDisplay(transaction.date),
@@ -281,13 +307,46 @@ const ReportsPage = () => {
       return acc;
     }, {} as Record<string, number>);
 
-  const categoryExpenses = Object.entries(expensesByCategory).map(([name, value], index) => ({
-    name,
-    value,
-    color: ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-purple-500'][index % 5]
-  }));
+  const categoryExpenses = Object.entries(expensesByCategory)
+    .sort(([a], [b]) => a.localeCompare(b, 'pt-BR')) // Ordenação alfabética
+    .map(([name, value], index) => ({
+      name,
+      value,
+      color: ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-purple-500'][index % 5]
+    }));
 
   const maxValue = Math.max(...categoryExpenses.map(cat => cat.value), 1);
+
+  // Calculate expenses by payment method
+  const expensesByPaymentMethod = dataToUse
+    .filter(t => t.type === 'expense')
+    .reduce((acc, t) => {
+      const paymentMethod = getPaymentMethodName(t.payment_method) || 'Outros';
+      acc[paymentMethod] = (acc[paymentMethod] || 0) + Number(t.amount);
+      return acc;
+    }, {} as Record<string, number>);
+
+  const paymentMethodExpenses = Object.entries(expensesByPaymentMethod)
+    .sort(([a], [b]) => a.localeCompare(b, 'pt-BR')) // Ordenação alfabética
+    .map(([name, value], index) => ({
+      name,
+      value,
+      color: ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500'][index % 5]
+    }));
+
+  const maxPaymentMethodValue = Math.max(...paymentMethodExpenses.map(pm => pm.value), 1);
+
+  // Function to get payment method display name
+  function getPaymentMethodName(paymentMethod: string): string {
+    const paymentMethods: Record<string, string> = {
+      'credit_card': 'Cartão de Crédito',
+      'debit_card': 'Cartão de Débito',
+      'cash': 'Dinheiro',
+      'pix': 'Pix',
+      'transfer': 'Transferência'
+    };
+    return paymentMethods[paymentMethod] || paymentMethod || 'Outros';
+  }
 
   // Calculate monthly evolution data
   const getMonthlyEvolution = () => {
@@ -544,6 +603,44 @@ const ReportsPage = () => {
           </div>
         );
 
+      case 'Método de Pagamento':
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Despesas por Método de Pagamento</h2>
+            <div className="space-y-4">
+              {paymentMethodExpenses.length > 0 ? (
+                paymentMethodExpenses.map((paymentMethod, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center flex-1">
+                      <span className="text-gray-700 w-32">{paymentMethod.name}</span>
+                      <div className="flex-1 mx-4">
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div
+                            className={`${paymentMethod.color} h-4 rounded-full transition-all duration-300`}
+                            style={{ width: `${(paymentMethod.value / maxPaymentMethodValue) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-gray-900 font-medium">
+                        R$ {paymentMethod.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <div className="text-xs text-gray-500">
+                        {((paymentMethod.value / expenses) * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Nenhuma despesa encontrada para o período selecionado</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       default: // Despesas por Categoria
         return (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -595,7 +692,7 @@ const ReportsPage = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Filtros de Relatório</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               PERÍODO:
@@ -623,19 +720,9 @@ const ReportsPage = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Despesas por Categoria">Despesas por Categoria</option>
-              <option value="Evolução Mensal">Evolução Mensal</option>
-              <option value="Receitas vs Despesas">Receitas vs Despesas</option>
+              <option value="Método de Pagamento">Método de Pagamento</option>
               <option value="Transações do Mês">Transações do Mês</option>
             </select>
-          </div>
-
-          <div className="flex items-end">
-            <button
-              onClick={generateReport}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-            >
-              Gerar Relatório
-            </button>
           </div>
         </div>
       </div>
