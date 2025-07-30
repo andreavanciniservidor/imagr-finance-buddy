@@ -9,6 +9,7 @@ import TransactionsPage from "@/components/TransactionsPage";
 import BudgetPage from "@/components/BudgetPage";
 import ReportsPage from "@/components/ReportsPage";
 import CategoriesPage from "@/components/CategoriesPage";
+import CartoesPage from "@/components/CartoesPage";
 import ComingSoon from "@/components/ComingSoon";
 import AuthPage from "@/components/AuthPage";
 
@@ -42,7 +43,7 @@ function AppContent() {
         <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/goals" element={<ComingSoon title="Metas" />} />
         <Route path="/investments" element={<ComingSoon title="Investimentos" />} />
-        <Route path="/cards" element={<ComingSoon title="Cartões" />} />
+        <Route path="/cards" element={<CartoesPage />} />
         <Route path="/bills" element={<ComingSoon title="Contas" />} />
         <Route path="/help" element={<ComingSoon title="Ajuda" />} />
         <Route path="/profile" element={<ComingSoon title="Perfil" />} />

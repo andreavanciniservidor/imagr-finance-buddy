@@ -9,6 +9,7 @@ import {
   ArrowLeftRight, 
   FileText, 
   Tag,
+  CreditCard,
   HelpCircle,
   LogOut
 } from 'lucide-react';
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Orçamento Doméstico', href: '/budget', icon: Target },
   { name: 'Transações', href: '/transactions', icon: ArrowLeftRight },
   { name: 'Categorias', href: '/categories', icon: Tag },
+  { name: 'Cartões', href: '/cards', icon: CreditCard },
   { name: 'Relatórios', href: '/reports', icon: FileText },
 ];
 

@@ -17,6 +17,13 @@ interface Category {
   name: string;
 }
 
+interface Cartao {
+  id: string;
+  nome: string;
+  cor: string;
+  dia_fechamento: number;
+}
+
 const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -28,6 +35,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [cartoes, setCartoes] = useState<Cartao[]>([]);
+  const [loadingCartoes, setLoadingCartoes] = useState(false);
   
   // Métodos de pagamento fixos (ordenados alfabeticamente)
   const paymentMethods = [
@@ -52,6 +61,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     description: '',
     category_id: '',
     payment_method: 'credit_card',
+    cartao_id: '',
     date: getCurrentDateString(),
     transactionType: type,
     isRecurring: false,
@@ -65,6 +75,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
+      fetchCartoes();
       // Definir parcelamento como true por padrão para cartão de crédito
       setShowInstallments(formData.payment_method === 'credit_card');
     }
@@ -119,7 +130,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
   // Verificar se as categorias estão vazias quando o tipo muda
   useEffect(() => {
-    if (isOpen && user) {
+    if (isOpen && user && categories.length === 0) {
       fetchCategories();
     }
   }, [formData.transactionType, isOpen, user]);
@@ -186,6 +197,64 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   };
 
+  const fetchCartoes = async () => {
+    if (!user) return;
+    
+    setLoadingCartoes(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('cartoes')
+        .select('id, nome, cor, dia_fechamento')
+        .eq('user_id', user.id)
+        .order('nome');
+
+      if (error) throw error;
+      
+      setCartoes(data || []);
+    } catch (error) {
+      console.error('Error fetching cartoes:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar cartões",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingCartoes(false);
+    }
+  };
+
+  // Função para calcular a data correta baseada no fechamento do cartão
+  const calculateCreditCardDate = (purchaseDate: string, cartaoId: string) => {
+    if (!cartaoId) return purchaseDate;
+
+    // Encontrar o cartão selecionado
+    const cartao = cartoes.find(c => c.id === cartaoId);
+    if (!cartao) return purchaseDate;
+
+    // Parse da data da compra
+    const [year, month, day] = purchaseDate.split('-').map(Number);
+    const purchaseDateObj = new Date(year, month - 1, day);
+    
+    // Verificar se a compra foi feita após o fechamento do cartão
+    const diaFechamento = cartao.dia_fechamento;
+    
+    if (day > diaFechamento) {
+      // Compra após fechamento: lançar para o mês posterior ao seguinte
+      purchaseDateObj.setMonth(purchaseDateObj.getMonth() + 2);
+    } else {
+      // Compra antes do fechamento: lançar para o mês seguinte
+      purchaseDateObj.setMonth(purchaseDateObj.getMonth() + 1);
+    }
+    
+    // Formatar data manualmente para evitar problemas de fuso horário
+    const newYear = purchaseDateObj.getFullYear();
+    const newMonth = String(purchaseDateObj.getMonth() + 1).padStart(2, '0');
+    const newDay = String(purchaseDateObj.getDate()).padStart(2, '0');
+    
+    return `${newYear}-${newMonth}-${newDay}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -203,9 +272,13 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         const baseDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
         
         for (let i = 0; i < formData.installments; i++) {
-          // Calcular a data de cada parcela (começando no mês seguinte)
-          const installmentDate = new Date(baseDate);
-          installmentDate.setMonth(baseDate.getMonth() + 1 + i);
+          // Calcular a data da primeira parcela baseada no fechamento do cartão
+          const firstInstallmentDate = calculateCreditCardDate(formData.date, formData.cartao_id);
+          const [firstYear, firstMonth, firstDay] = firstInstallmentDate.split('-').map(Number);
+          
+          // Calcular a data de cada parcela subsequente
+          const installmentDate = new Date(firstYear, firstMonth - 1, firstDay);
+          installmentDate.setMonth(installmentDate.getMonth() + i);
           
           // Formatar data manualmente para evitar problemas de fuso horário
           const installmentYear = installmentDate.getFullYear();
@@ -225,6 +298,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             category_id: formData.category_id || null,
             account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
             payment_method: formData.payment_method,
+            cartao_id: formData.payment_method === 'credit_card' ? formData.cartao_id || null : null,
             date: formattedDate,
             type: formData.transactionType
           });
@@ -242,18 +316,9 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         // Transação única
         let transactionDate = formData.date;
         
-        // Se for cartão de crédito, lançar no mês seguinte (independente de parcelamento)
+        // Se for cartão de crédito, calcular data baseada no fechamento do cartão
         if (isCreditCard) {
-          // Criar data local para evitar problemas de fuso horário
-          const [year, month, day] = formData.date.split('-').map(Number);
-          const date = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
-          date.setMonth(date.getMonth() + 1);
-          
-          // Formatar data manualmente para evitar problemas de fuso horário
-          const newYear = date.getFullYear();
-          const newMonth = String(date.getMonth() + 1).padStart(2, '0');
-          const newDay = String(date.getDate()).padStart(2, '0');
-          transactionDate = `${newYear}-${newMonth}-${newDay}`;
+          transactionDate = calculateCreditCardDate(formData.date, formData.cartao_id);
         }
 
         const { error } = await supabase.from('transactions').insert({
@@ -263,6 +328,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           category_id: formData.category_id || null,
           account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
           payment_method: formData.payment_method,
+          cartao_id: formData.payment_method === 'credit_card' ? formData.cartao_id || null : null,
           date: transactionDate,
           type: formData.transactionType
         });
@@ -282,6 +348,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         description: '',
         category_id: '',
         payment_method: 'credit_card',
+        cartao_id: '',
         date: getCurrentDateString(),
         transactionType: type,
         isRecurring: false,
@@ -446,7 +513,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
                 value={formData.payment_method}
                 onChange={(e) => {
-                  setFormData({ ...formData, payment_method: e.target.value });
+                  setFormData({ ...formData, payment_method: e.target.value, cartao_id: '' });
                   // Mostrar seção de parcelamento apenas se for cartão de crédito
                   setShowInstallments(e.target.value === 'credit_card');
                 }}
@@ -460,6 +527,49 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
           </div>
+
+          {/* Campo Cartão - aparece apenas quando Cartão de Crédito é selecionado */}
+          {formData.payment_method === 'credit_card' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cartão
+                {loadingCartoes && (
+                  <span className="ml-2 text-xs text-blue-600">(Carregando...)</span>
+                )}
+              </label>
+              <div className="relative">
+                <select
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${
+                    loadingCartoes ? 'bg-gray-50' : 'bg-white'
+                  }`}
+                  value={formData.cartao_id}
+                  onChange={(e) => setFormData({ ...formData, cartao_id: e.target.value })}
+                  disabled={loadingCartoes}
+                  required={formData.payment_method === 'credit_card'}
+                >
+                  <option value="">
+                    {loadingCartoes 
+                      ? 'Carregando cartões...' 
+                      : cartoes.length === 0 
+                        ? 'Nenhum cartão encontrado'
+                        : 'Selecione um cartão'
+                    }
+                  </option>
+                  {cartoes.map((cartao) => (
+                    <option key={cartao.id} value={cartao.id}>
+                      {cartao.nome}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+              {cartoes.length === 0 && !loadingCartoes && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Nenhum cartão cadastrado. <span className="text-blue-600 cursor-pointer hover:underline">Cadastre um cartão primeiro</span>.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Transação Recorrente */}
           <div className="flex items-center space-x-2">
@@ -479,7 +589,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           {showInstallments && (
             <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-4 space-y-4">
               <div className="bg-yellow-200 text-yellow-800 text-xs p-2 rounded">
-                <strong>Nota:</strong> Em compras com cartão de crédito, o lançamento é feito para o mês seguinte.
+                <strong>Nota:</strong> O lançamento considera o dia de fechamento do cartão. Compras após o fechamento vão para o mês posterior ao seguinte.
               </div>
               
               <button
