@@ -341,21 +341,21 @@ const CategoriesPage = () => {
               {filteredCategories.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredCategories.map((category) => (
-                    <div key={category.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div 
+                      key={category.id} 
+                      className="rounded-lg p-4 hover:shadow-md transition-shadow text-white"
+                      style={{ backgroundColor: category.color }}
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">
-                          <div
-                            className="w-4 h-4 rounded-full"
-                            style={{ backgroundColor: category.color }}
-                          />
-                          <h3 className="font-medium text-gray-900">{category.name}</h3>
+                          <h3 className="font-medium text-white">{category.name}</h3>
                         </div>
                         <div className="flex space-x-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(category)}
-                            className="p-1 h-8 w-8"
+                            className="p-1 h-8 w-8 text-white hover:text-white hover:bg-white hover:bg-opacity-20"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -364,7 +364,7 @@ const CategoriesPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="p-1 h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="p-1 h-8 w-8 text-white hover:text-white hover:bg-white hover:bg-opacity-20"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -389,7 +389,7 @@ const CategoriesPage = () => {
                           </AlertDialog>
                         </div>
                       </div>
-                      <div className="flex items-center text-sm text-gray-500">
+                      <div className="flex items-center text-sm text-white text-opacity-90">
                         <Tag className="w-4 h-4 mr-1" />
                         Despesa
                       </div>
@@ -412,21 +412,21 @@ const CategoriesPage = () => {
               {filteredCategories.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredCategories.map((category) => (
-                    <div key={category.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div 
+                      key={category.id} 
+                      className="rounded-lg p-4 hover:shadow-md transition-shadow text-white"
+                      style={{ backgroundColor: category.color }}
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">
-                          <div
-                            className="w-4 h-4 rounded-full"
-                            style={{ backgroundColor: category.color }}
-                          />
-                          <h3 className="font-medium text-gray-900">{category.name}</h3>
+                          <h3 className="font-medium text-white">{category.name}</h3>
                         </div>
                         <div className="flex space-x-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(category)}
-                            className="p-1 h-8 w-8"
+                            className="p-1 h-8 w-8 text-white hover:text-white hover:bg-white hover:bg-opacity-20"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -435,7 +435,7 @@ const CategoriesPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="p-1 h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="p-1 h-8 w-8 text-white hover:text-white hover:bg-white hover:bg-opacity-20"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -460,7 +460,7 @@ const CategoriesPage = () => {
                           </AlertDialog>
                         </div>
                       </div>
-                      <div className="flex items-center text-sm text-gray-500">
+                      <div className="flex items-center text-sm text-white text-opacity-90">
                         <Tag className="w-4 h-4 mr-1" />
                         Receita
                       </div>
