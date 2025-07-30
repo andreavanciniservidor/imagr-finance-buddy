@@ -203,35 +203,32 @@ const CartoesPage = () => {
         {cartoes.map((cartao) => (
           <div
             key={cartao.id}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+            className="rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow text-white"
+            style={{ backgroundColor: cartao.cor }}
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: cartao.cor }}
-                />
-                <CreditCard size={20} className="text-gray-600" />
+                <CreditCard size={20} className="text-white" />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleEdit(cartao)}
-                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                  className="p-2 text-white hover:text-white hover:bg-white hover:bg-opacity-20 rounded-md transition-colors"
                 >
                   <Edit size={16} />
                 </button>
                 <button
                   onClick={() => handleDelete(cartao.id)}
-                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                  className="p-2 text-white hover:text-white hover:bg-white hover:bg-opacity-20 rounded-md transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             </div>
 
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{cartao.nome}</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">{cartao.nome}</h3>
             
-            <div className="space-y-2 text-sm text-gray-600">
+            <div className="space-y-2 text-sm text-white text-opacity-90">
               <div className="flex justify-between">
                 <span>Fechamento:</span>
                 <span className="font-medium">Dia {cartao.dia_fechamento}</span>
