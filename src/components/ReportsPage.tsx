@@ -7,9 +7,17 @@ import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
 
+// Função utilitária para formatar datas sem problemas de fuso horário
+const formatDateForDisplay = (dateString: string) => {
+  const [year, month, day] = dateString.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return date.toLocaleDateString('pt-BR');
+};
+
 interface Transaction {
   id: string;
   date: string;
+  description: string;
   amount: number;
   type: 'income' | 'expense';
   categories: { name: string } | null;
@@ -40,6 +48,7 @@ const ReportsPage = () => {
         .select(`
           id,
           date,
+          description,
           amount,
           type,
           categories(name)
@@ -57,6 +66,7 @@ const ReportsPage = () => {
       setTransactions(typedTransactions);
       setFilteredTransactions(typedTransactions); // Initialize with all transactions
     } catch (error) {
+      console.error('Erro ao carregar transações:', error);
       toast({
         title: "Erro",
         description: "Erro ao carregar transações",
@@ -106,7 +116,9 @@ const ReportsPage = () => {
     const { startDate, endDate } = getDateRange(period);
 
     const filtered = transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date);
+      // Parse manual da data para evitar problemas de fuso horário
+      const [year, month, day] = transaction.date.split('-').map(Number);
+      const transactionDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
       return transactionDate >= startDate && transactionDate <= endDate;
     });
 
@@ -155,6 +167,18 @@ const ReportsPage = () => {
           'Receitas (R$)': month.income.toFixed(2),
           'Despesas (R$)': month.expenses.toFixed(2),
           'Saldo (R$)': month.balance.toFixed(2)
+        }));
+        break;
+
+      case 'Transações do Mês':
+        csvData = filteredTransactions.map(transaction => ({
+          'Data': formatDateForDisplay(transaction.date),
+          'Descrição': transaction.description && transaction.description.trim() !== ''
+            ? transaction.description
+            : transaction.categories?.name || (transaction.type === 'income' ? 'Receita' : 'Despesa'),
+          'Categoria': transaction.categories?.name || 'Outros',
+          'Tipo': transaction.type === 'income' ? 'Receita' : 'Despesa',
+          'Valor (R$)': transaction.amount.toFixed(2)
         }));
         break;
     }
@@ -436,6 +460,90 @@ const ReportsPage = () => {
           </div>
         );
 
+      case 'Transações do Mês':
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Transações do Mês</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredTransactions.length > 0 ? (
+                    filteredTransactions
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((transaction) => (
+                        <tr key={transaction.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDateForDisplay(transaction.date)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {transaction.description || transaction.categories?.name || (transaction.type === 'income' ? 'Receita' : 'Despesa')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {transaction.categories?.name || 'Outros'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${transaction.type === 'income'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                              }`}>
+                              {transaction.type === 'income' ? 'Receita' : 'Despesa'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                              {transaction.type === 'income' ? '+' : '-'} R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                        Nenhuma transação encontrada para o período selecionado
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Resumo das transações */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Total de Transações</p>
+                <p className="text-lg font-bold text-gray-900">{filteredTransactions.length}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Receitas</p>
+                <p className="text-lg font-bold text-green-600">
+                  R$ {filteredTransactions
+                    .filter(t => t.type === 'income')
+                    .reduce((sum, t) => sum + Number(t.amount), 0)
+                    .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Despesas</p>
+                <p className="text-lg font-bold text-red-600">
+                  R$ {filteredTransactions
+                    .filter(t => t.type === 'expense')
+                    .reduce((sum, t) => sum + Number(t.amount), 0)
+                    .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
       default: // Despesas por Categoria
         return (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -517,6 +625,7 @@ const ReportsPage = () => {
               <option value="Despesas por Categoria">Despesas por Categoria</option>
               <option value="Evolução Mensal">Evolução Mensal</option>
               <option value="Receitas vs Despesas">Receitas vs Despesas</option>
+              <option value="Transações do Mês">Transações do Mês</option>
             </select>
           </div>
 
