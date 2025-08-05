@@ -73,6 +73,53 @@ export type Database = {
           },
         ]
       }
+      cartoes: {
+        Row: {
+          cor: string
+          created_at: string
+          dia_fechamento: number
+          dia_vencimento: number | null
+          id: string
+          limite: number
+          melhor_dia_compra: number | null
+          nome: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          dia_fechamento: number
+          dia_vencimento?: number | null
+          id?: string
+          limite?: number
+          melhor_dia_compra?: number | null
+          nome: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          dia_fechamento?: number
+          dia_vencimento?: number | null
+          id?: string
+          limite?: number
+          melhor_dia_compra?: number | null
+          nome?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cartoes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -98,6 +145,7 @@ export type Database = {
         Row: {
           account_id: string | null
           amount: number
+          cartao_id: string | null
           category_id: string | null
           created_at: string
           date: string
@@ -109,6 +157,7 @@ export type Database = {
         Insert: {
           account_id?: string | null
           amount: number
+          cartao_id?: string | null
           category_id?: string | null
           created_at?: string
           date: string
@@ -120,6 +169,7 @@ export type Database = {
         Update: {
           account_id?: string | null
           amount?: number
+          cartao_id?: string | null
           category_id?: string | null
           created_at?: string
           date?: string
@@ -134,6 +184,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_cartao_id_fkey"
+            columns: ["cartao_id"]
+            isOneToOne: false
+            referencedRelation: "cartoes"
             referencedColumns: ["id"]
           },
           {

@@ -25,6 +25,7 @@ interface Transaction {
   type: 'income' | 'expense';
   category_id: string | null;
   account_id: string | null;
+  cartao_id: string | null;
   payment_method?: string;
   categories: { name: string } | null;
   accounts: { name: string } | null;
@@ -86,6 +87,7 @@ const TransactionsPage = () => {
           type,
           category_id,
           account_id,
+          cartao_id,
           payment_method,
           categories(name),
           accounts(name)

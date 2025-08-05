@@ -1,9 +1,21 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Calendar, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
+import FaturaPreview from './FaturaPreview';
+import { FaturaCalculator } from '@/lib/faturaCalculator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -22,6 +34,8 @@ interface Cartao {
   nome: string;
   cor: string;
   dia_fechamento: number;
+  dia_vencimento: number | null;
+  melhor_dia_compra: number | null;
 }
 
 const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ 
@@ -70,7 +84,48 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     observations: ''
   });
 
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [showInstallments, setShowInstallments] = useState(false);
+  const [showDateChangeDialog, setShowDateChangeDialog] = useState(false);
+  const [pendingDateChange, setPendingDateChange] = useState<string | null>(null);
+
+  // Debounced loading for preview calculations
+  const debouncePreviewLoading = useCallback(() => {
+    setPreviewLoading(true);
+    const timer = setTimeout(() => {
+      setPreviewLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Check if date change is significant (more than 1 month difference in launch date)
+  const checkSignificantDateChange = useCallback((newDate: string, oldDate: string, cartaoId: string) => {
+    if (!cartaoId || !newDate || !oldDate) return false;
+    
+    const cartao = cartoes.find(c => c.id === cartaoId);
+    if (!cartao) return false;
+
+    try {
+      const [newYear, newMonth, newDay] = newDate.split('-').map(Number);
+      const [oldYear, oldMonth, oldDay] = oldDate.split('-').map(Number);
+      
+      const newPurchaseDate = new Date(newYear, newMonth - 1, newDay);
+      const oldPurchaseDate = new Date(oldYear, oldMonth - 1, oldDay);
+      
+      const newLaunchDate = FaturaCalculator.calculateLaunchDate(newPurchaseDate, cartao);
+      const oldLaunchDate = FaturaCalculator.calculateLaunchDate(oldPurchaseDate, cartao);
+      
+      const monthsDifference = Math.abs(
+        (newLaunchDate.getFullYear() - oldLaunchDate.getFullYear()) * 12 + 
+        (newLaunchDate.getMonth() - oldLaunchDate.getMonth())
+      );
+      
+      return monthsDifference > 1;
+    } catch (error) {
+      console.warn('Error checking significant date change:', error);
+      return false;
+    }
+  }, [cartoes]);
 
   useEffect(() => {
     if (isOpen) {
@@ -205,7 +260,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     try {
       const { data, error } = await supabase
         .from('cartoes')
-        .select('id, nome, cor, dia_fechamento')
+        .select('id, nome, cor, dia_fechamento, dia_vencimento, melhor_dia_compra')
         .eq('user_id', user.id)
         .order('nome');
 
@@ -224,8 +279,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   };
 
-  // Função para calcular a data correta baseada no fechamento do cartão
-  const calculateCreditCardDate = (purchaseDate: string, cartaoId: string) => {
+  // Função original para calcular a data correta baseada no fechamento do cartão (fallback)
+  const calculateCreditCardDateLegacy = (purchaseDate: string, cartaoId: string) => {
     if (!cartaoId) return purchaseDate;
 
     // Encontrar o cartão selecionado
@@ -255,6 +310,35 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     return `${newYear}-${newMonth}-${newDay}`;
   };
 
+  // Função melhorada para calcular a data correta usando FaturaCalculator
+  const calculateCreditCardDate = (purchaseDate: string, cartaoId: string) => {
+    if (!cartaoId) return purchaseDate;
+
+    // Encontrar o cartão selecionado
+    const cartao = cartoes.find(c => c.id === cartaoId);
+    if (!cartao) return purchaseDate;
+
+    try {
+      // Parse da data da compra
+      const [year, month, day] = purchaseDate.split('-').map(Number);
+      const purchaseDateObj = new Date(year, month - 1, day);
+      
+      // Usar FaturaCalculator para cálculo preciso
+      const launchDate = FaturaCalculator.calculateLaunchDate(purchaseDateObj, cartao);
+      
+      // Formatar data para string
+      const newYear = launchDate.getFullYear();
+      const newMonth = String(launchDate.getMonth() + 1).padStart(2, '0');
+      const newDay = String(launchDate.getDate()).padStart(2, '0');
+      
+      return `${newYear}-${newMonth}-${newDay}`;
+    } catch (error) {
+      // Em caso de erro, usar lógica legacy como fallback
+      console.warn('Erro no cálculo de data do cartão, usando lógica legacy:', error);
+      return calculateCreditCardDateLegacy(purchaseDate, cartaoId);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -272,19 +356,19 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         const baseDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
         
         for (let i = 0; i < formData.installments; i++) {
-          // Calcular a data da primeira parcela baseada no fechamento do cartão
-          const firstInstallmentDate = calculateCreditCardDate(formData.date, formData.cartao_id);
-          const [firstYear, firstMonth, firstDay] = firstInstallmentDate.split('-').map(Number);
+          // Calcular a data de cada parcela individualmente usando FaturaCalculator
+          const [year, month, day] = formData.date.split('-').map(Number);
+          const purchaseDate = new Date(year, month - 1, day);
           
-          // Calcular a data de cada parcela subsequente
-          const installmentDate = new Date(firstYear, firstMonth - 1, firstDay);
-          installmentDate.setMonth(installmentDate.getMonth() + i);
+          // Para cada parcela, calcular a data baseada na data de compra + i meses
+          const installmentPurchaseDate = new Date(purchaseDate);
+          installmentPurchaseDate.setMonth(installmentPurchaseDate.getMonth() + i);
           
-          // Formatar data manualmente para evitar problemas de fuso horário
-          const installmentYear = installmentDate.getFullYear();
-          const installmentMonth = String(installmentDate.getMonth() + 1).padStart(2, '0');
-          const installmentDay = String(installmentDate.getDate()).padStart(2, '0');
-          const formattedDate = `${installmentYear}-${installmentMonth}-${installmentDay}`;
+          // Usar FaturaCalculator para cada parcela individualmente
+          const installmentLaunchDate = calculateCreditCardDate(
+            `${installmentPurchaseDate.getFullYear()}-${String(installmentPurchaseDate.getMonth() + 1).padStart(2, '0')}-${String(installmentPurchaseDate.getDate()).padStart(2, '0')}`,
+            formData.cartao_id
+          );
           
           // Ajustar descrição para incluir número da parcela
           const installmentDescription = formData.installments > 1 
@@ -299,7 +383,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
             payment_method: formData.payment_method,
             cartao_id: formData.payment_method === 'credit_card' ? formData.cartao_id || null : null,
-            date: formattedDate,
+            date: installmentLaunchDate,
             type: formData.transactionType
           });
         }
@@ -429,7 +513,23 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                   type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    const oldDate = formData.date;
+                    
+                    // Check if this is a significant date change for credit cards
+                    if (formData.payment_method === 'credit_card' && formData.cartao_id && 
+                        checkSignificantDateChange(newDate, oldDate, formData.cartao_id)) {
+                      setPendingDateChange(newDate);
+                      setShowDateChangeDialog(true);
+                    } else {
+                      setFormData({ ...formData, date: newDate });
+                      // Trigger preview loading animation
+                      if (formData.payment_method === 'credit_card' && formData.cartao_id) {
+                        debouncePreviewLoading();
+                      }
+                    }
+                  }}
                   required
                 />
                 <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -571,6 +671,17 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             </div>
           )}
 
+          {/* FaturaPreview - aparece quando cartão de crédito é selecionado */}
+          {formData.payment_method === 'credit_card' && formData.cartao_id && (
+            <FaturaPreview
+              cartao={cartoes.find(c => c.id === formData.cartao_id) || null}
+              purchaseDate={formData.date}
+              amount={formData.amount}
+              isLoading={previewLoading}
+              className="mt-4"
+            />
+          )}
+
           {/* Transação Recorrente */}
           <div className="flex items-center space-x-2">
             <input
@@ -704,6 +815,40 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Date Change Confirmation Dialog */}
+      <AlertDialog open={showDateChangeDialog} onOpenChange={setShowDateChangeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mudança Significativa de Data</AlertDialogTitle>
+            <AlertDialogDescription>
+              A mudança de data resultará em uma diferença significativa na data de lançamento da fatura 
+              (mais de 1 mês). Isso pode afetar o planejamento financeiro. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowDateChangeDialog(false);
+              setPendingDateChange(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingDateChange) {
+                setFormData({ ...formData, date: pendingDateChange });
+                // Trigger preview loading animation
+                if (formData.payment_method === 'credit_card' && formData.cartao_id) {
+                  debouncePreviewLoading();
+                }
+              }
+              setShowDateChangeDialog(false);
+              setPendingDateChange(null);
+            }}>
+              Continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
