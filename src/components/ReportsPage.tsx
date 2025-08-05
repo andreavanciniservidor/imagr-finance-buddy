@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,7 +61,11 @@ const ReportsPage = () => {
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data || []);
+      // Type assertion to ensure proper typing
+      setTransactions((data || []).map(transaction => ({
+        ...transaction,
+        type: transaction.type as 'income' | 'expense'
+      })));
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({

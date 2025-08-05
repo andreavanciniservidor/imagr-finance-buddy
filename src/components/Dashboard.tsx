@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Target, CreditCard, PiggyBank } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ interface Transaction {
   date: string;
   type: 'income' | 'expense';
   payment_method: string | null;
+  category_id: string | null;
 }
 
 interface Budget {
@@ -19,6 +21,7 @@ interface Budget {
   amount: number;
   period: string;
   alert_threshold: number;
+  category_id: string | null;
 }
 
 const Dashboard = () => {
@@ -96,14 +99,18 @@ const Dashboard = () => {
 
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, amount, description, date, type, payment_method')
+        .select('id, amount, description, date, type, payment_method, category_id')
         .eq('user_id', user.id)
         .gte('date', firstDayOfMonth.toISOString().split('T')[0])
         .lte('date', lastDayOfMonth.toISOString().split('T')[0])
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data || []);
+      // Type assertion to ensure proper typing
+      setTransactions((data || []).map(transaction => ({
+        ...transaction,
+        type: transaction.type as 'income' | 'expense'
+      })));
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
@@ -122,7 +129,7 @@ const Dashboard = () => {
     try {
       const { data, error } = await supabase
         .from('budgets')
-        .select('id, name, amount, period, alert_threshold')
+        .select('id, name, amount, period, alert_threshold, category_id')
         .eq('user_id', user.id);
 
       if (error) throw error;

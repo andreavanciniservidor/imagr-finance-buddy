@@ -44,7 +44,11 @@ const CategoriesPage = () => {
         .order('name', { ascending: true });
 
       if (error) throw error;
-      setCategories(data || []);
+      // Type assertion to ensure proper typing
+      setCategories((data || []).map(cat => ({
+        ...cat,
+        type: cat.type as 'income' | 'expense'
+      })));
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast({

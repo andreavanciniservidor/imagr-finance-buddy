@@ -62,7 +62,11 @@ const TransactionsPage = () => {
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data || []);
+      // Type assertion to ensure proper typing
+      setTransactions((data || []).map(transaction => ({
+        ...transaction,
+        type: transaction.type as 'income' | 'expense'
+      })));
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
