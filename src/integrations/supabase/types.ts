@@ -37,6 +37,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          alert_threshold: number | null
           amount: number
           category_id: string | null
           created_at: string
@@ -46,6 +47,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          alert_threshold?: number | null
           amount: number
           category_id?: string | null
           created_at?: string
@@ -55,6 +57,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          alert_threshold?: number | null
           amount?: number
           category_id?: string | null
           created_at?: string
@@ -75,69 +78,67 @@ export type Database = {
       }
       cartoes: {
         Row: {
-          cor: string
-          created_at: string
+          cor: string | null
+          created_at: string | null
           dia_fechamento: number
           dia_vencimento: number | null
           id: string
-          limite: number
+          limite: number | null
           melhor_dia_compra: number | null
           nome: string
-          updated_at: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
-          cor?: string
-          created_at?: string
+          cor?: string | null
+          created_at?: string | null
           dia_fechamento: number
           dia_vencimento?: number | null
           id?: string
-          limite?: number
+          limite?: number | null
           melhor_dia_compra?: number | null
           nome: string
-          updated_at?: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
-          cor?: string
-          created_at?: string
+          cor?: string | null
+          created_at?: string | null
           dia_fechamento?: number
           dia_vencimento?: number | null
           id?: string
-          limite?: number
+          limite?: number | null
           melhor_dia_compra?: number | null
           nome?: string
-          updated_at?: string
+          updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "cartoes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       categories: {
         Row: {
+          color: string | null
           created_at: string
           id: string
           name: string
           type: string
+          user_id: string | null
         }
         Insert: {
+          color?: string | null
           created_at?: string
           id?: string
           name: string
           type: string
+          user_id?: string | null
         }
         Update: {
+          color?: string | null
           created_at?: string
           id?: string
           name?: string
           type?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -151,6 +152,7 @@ export type Database = {
           date: string
           description: string
           id: string
+          payment_method: string | null
           type: string
           user_id: string
         }
@@ -163,6 +165,7 @@ export type Database = {
           date: string
           description: string
           id?: string
+          payment_method?: string | null
           type: string
           user_id: string
         }
@@ -175,6 +178,7 @@ export type Database = {
           date?: string
           description?: string
           id?: string
+          payment_method?: string | null
           type?: string
           user_id?: string
         }

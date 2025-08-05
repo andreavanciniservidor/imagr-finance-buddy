@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Calendar, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +35,10 @@ interface Cartao {
   dia_fechamento: number;
   dia_vencimento: number | null;
   melhor_dia_compra: number | null;
+  limite: number;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ 
@@ -140,7 +143,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && isOpen && categories.length === 0 && user) {
-        // App voltou do background e modal está aberto mas sem categorias
         console.log('App voltou do background, recarregando categorias...');
         fetchCategories();
       }
@@ -148,7 +150,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
     const handleFocus = () => {
       if (isOpen && categories.length === 0 && user) {
-        // Janela ganhou foco e modal está aberto mas sem categorias
         console.log('Janela ganhou foco, recarregando categorias...');
         fetchCategories();
       }
@@ -156,7 +157,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted && isOpen && categories.length === 0 && user) {
-        // Página foi restaurada do cache (mobile)
         console.log('Página restaurada do cache, recarregando categorias...');
         fetchCategories();
       }
@@ -164,7 +164,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
     const handleResume = () => {
       if (isOpen && categories.length === 0 && user) {
-        // App resumiu (mobile)
         console.log('App resumiu, recarregando categorias...');
         fetchCategories();
       }
@@ -193,7 +192,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   // Forçar re-render quando as categorias são carregadas
   useEffect(() => {
     if (categories.length > 0 && formData.category_id === '' && !loadingCategories) {
-      // Força uma atualização do componente para garantir que o select seja re-renderizado
       setFormData(prev => ({ ...prev, category_id: '' }));
     }
   }, [categories.length, loadingCategories]);
@@ -217,7 +215,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       setCategories(data || []);
       console.log(`Categorias carregadas: ${data?.length || 0} encontradas`);
       
-      // Se não encontrou categorias e é a primeira tentativa, tentar novamente
       if ((!data || data.length === 0) && retryCount === 0) {
         console.log('Nenhuma categoria encontrada, tentando novamente...');
         setTimeout(() => {
@@ -229,7 +226,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     } catch (error) {
       console.error('Error fetching categories:', error);
       
-      // Só mostrar toast de erro após algumas tentativas
       if (retryCount >= 2) {
         toast({
           title: "Erro",
@@ -238,9 +234,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         });
       }
       
-      // Tentar novamente até 3 vezes
       if (retryCount < 3) {
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Backoff exponencial
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
         setTimeout(() => {
           if (isOpen && user) {
             fetchCategories(retryCount + 1);
@@ -260,7 +255,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     try {
       const { data, error } = await supabase
         .from('cartoes')
-        .select('id, nome, cor, dia_fechamento, dia_vencimento, melhor_dia_compra')
+        .select('id, nome, cor, dia_fechamento, dia_vencimento, melhor_dia_compra, limite, user_id, created_at, updated_at')
         .eq('user_id', user.id)
         .order('nome');
 
@@ -283,26 +278,20 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const calculateCreditCardDateLegacy = (purchaseDate: string, cartaoId: string) => {
     if (!cartaoId) return purchaseDate;
 
-    // Encontrar o cartão selecionado
     const cartao = cartoes.find(c => c.id === cartaoId);
     if (!cartao) return purchaseDate;
 
-    // Parse da data da compra
     const [year, month, day] = purchaseDate.split('-').map(Number);
     const purchaseDateObj = new Date(year, month - 1, day);
     
-    // Verificar se a compra foi feita após o fechamento do cartão
     const diaFechamento = cartao.dia_fechamento;
     
     if (day > diaFechamento) {
-      // Compra após fechamento: lançar para o mês posterior ao seguinte
       purchaseDateObj.setMonth(purchaseDateObj.getMonth() + 2);
     } else {
-      // Compra antes do fechamento: lançar para o mês seguinte
       purchaseDateObj.setMonth(purchaseDateObj.getMonth() + 1);
     }
     
-    // Formatar data manualmente para evitar problemas de fuso horário
     const newYear = purchaseDateObj.getFullYear();
     const newMonth = String(purchaseDateObj.getMonth() + 1).padStart(2, '0');
     const newDay = String(purchaseDateObj.getDate()).padStart(2, '0');
@@ -314,26 +303,21 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const calculateCreditCardDate = (purchaseDate: string, cartaoId: string) => {
     if (!cartaoId) return purchaseDate;
 
-    // Encontrar o cartão selecionado
     const cartao = cartoes.find(c => c.id === cartaoId);
     if (!cartao) return purchaseDate;
 
     try {
-      // Parse da data da compra
       const [year, month, day] = purchaseDate.split('-').map(Number);
       const purchaseDateObj = new Date(year, month - 1, day);
       
-      // Usar FaturaCalculator para cálculo preciso
       const launchDate = FaturaCalculator.calculateLaunchDate(purchaseDateObj, cartao);
       
-      // Formatar data para string
       const newYear = launchDate.getFullYear();
       const newMonth = String(launchDate.getMonth() + 1).padStart(2, '0');
       const newDay = String(launchDate.getDate()).padStart(2, '0');
       
       return `${newYear}-${newMonth}-${newDay}`;
     } catch (error) {
-      // Em caso de erro, usar lógica legacy como fallback
       console.warn('Erro no cálculo de data do cartão, usando lógica legacy:', error);
       return calculateCreditCardDateLegacy(purchaseDate, cartaoId);
     }
@@ -345,32 +329,26 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
     setLoading(true);
     try {
-      // Verificar se é cartão de crédito e tem parcelamento
       const isCreditCard = formData.payment_method === 'credit_card';
       const isInstallment = isCreditCard && showInstallments && formData.installments > 1;
 
       if (isInstallment) {
-        // Criar múltiplas transações para parcelamento
         const transactions = [];
         const [year, month, day] = formData.date.split('-').map(Number);
-        const baseDate = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
+        const baseDate = new Date(year, month - 1, day);
         
         for (let i = 0; i < formData.installments; i++) {
-          // Calcular a data de cada parcela individualmente usando FaturaCalculator
           const [year, month, day] = formData.date.split('-').map(Number);
           const purchaseDate = new Date(year, month - 1, day);
           
-          // Para cada parcela, calcular a data baseada na data de compra + i meses
           const installmentPurchaseDate = new Date(purchaseDate);
           installmentPurchaseDate.setMonth(installmentPurchaseDate.getMonth() + i);
           
-          // Usar FaturaCalculator para cada parcela individualmente
           const installmentLaunchDate = calculateCreditCardDate(
             `${installmentPurchaseDate.getFullYear()}-${String(installmentPurchaseDate.getMonth() + 1).padStart(2, '0')}-${String(installmentPurchaseDate.getDate()).padStart(2, '0')}`,
             formData.cartao_id
           );
           
-          // Ajustar descrição para incluir número da parcela
           const installmentDescription = formData.installments > 1 
             ? `${formData.description} (${i + 1}/${formData.installments})`
             : formData.description;
@@ -380,7 +358,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             amount: parseFloat(formData.amount),
             description: installmentDescription,
             category_id: formData.category_id || null,
-            account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
+            account_id: null,
             payment_method: formData.payment_method,
             cartao_id: formData.payment_method === 'credit_card' ? formData.cartao_id || null : null,
             date: installmentLaunchDate,
@@ -388,7 +366,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           });
         }
 
-        // Inserir todas as parcelas
         const { error } = await supabase.from('transactions').insert(transactions);
         if (error) throw error;
 
@@ -397,10 +374,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           description: `Compra parcelada em ${formData.installments}x criada com sucesso!`,
         });
       } else {
-        // Transação única
         let transactionDate = formData.date;
         
-        // Se for cartão de crédito, calcular data baseada no fechamento do cartão
         if (isCreditCard) {
           transactionDate = calculateCreditCardDate(formData.date, formData.cartao_id);
         }
@@ -410,7 +385,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           amount: parseFloat(formData.amount),
           description: formData.description,
           category_id: formData.category_id || null,
-          account_id: null, // Não usamos mais account_id, mas mantemos para compatibilidade
+          account_id: null,
           payment_method: formData.payment_method,
           cartao_id: formData.payment_method === 'credit_card' ? formData.cartao_id || null : null,
           date: transactionDate,
@@ -495,7 +470,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 value={formData.amount}
                 onChange={(e) => {
                   setFormData({ ...formData, amount: e.target.value });
-                  // Calcular valor total se houver parcelas
                   if (formData.installments > 1) {
                     const total = parseFloat(e.target.value) * formData.installments;
                     setFormData(prev => ({ ...prev, amount: e.target.value, totalAmount: total.toFixed(2) }));
@@ -517,14 +491,12 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     const newDate = e.target.value;
                     const oldDate = formData.date;
                     
-                    // Check if this is a significant date change for credit cards
                     if (formData.payment_method === 'credit_card' && formData.cartao_id && 
                         checkSignificantDateChange(newDate, oldDate, formData.cartao_id)) {
                       setPendingDateChange(newDate);
                       setShowDateChangeDialog(true);
                     } else {
                       setFormData({ ...formData, date: newDate });
-                      // Trigger preview loading animation
                       if (formData.payment_method === 'credit_card' && formData.cartao_id) {
                         debouncePreviewLoading();
                       }
@@ -599,7 +571,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 </select>
                 <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
-
             </div>
           </div>
 
@@ -614,7 +585,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 value={formData.payment_method}
                 onChange={(e) => {
                   setFormData({ ...formData, payment_method: e.target.value, cartao_id: '' });
-                  // Mostrar seção de parcelamento apenas se for cartão de crédito
                   setShowInstallments(e.target.value === 'credit_card');
                 }}
               >
@@ -707,7 +677,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 type="button"
                 className="w-full bg-pink-500 text-white py-2 px-4 rounded-md hover:bg-pink-600 font-medium"
                 onClick={() => {
-                  // Lógica para compra parcelada
                   if (formData.installments > 1) {
                     const total = parseFloat(formData.amount) * formData.installments;
                     setFormData(prev => ({ ...prev, totalAmount: total.toFixed(2) }));
@@ -836,7 +805,6 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             <AlertDialogAction onClick={() => {
               if (pendingDateChange) {
                 setFormData({ ...formData, date: pendingDateChange });
-                // Trigger preview loading animation
                 if (formData.payment_method === 'credit_card' && formData.cartao_id) {
                   debouncePreviewLoading();
                 }

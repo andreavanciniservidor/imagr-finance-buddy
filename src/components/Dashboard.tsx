@@ -1,25 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, TrendingUp, TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Target, CreditCard, PiggyBank } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import AddTransactionModal from './AddTransactionModal';
 import { useToast } from './ui/use-toast';
-
-// Função utilitária para formatar datas sem problemas de fuso horário
-const formatDateForDisplay = (dateString: string) => {
-  const [year, month, day] = dateString.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  return date.toLocaleDateString('pt-BR');
-};
 
 interface Transaction {
   id: string;
-  date: string;
-  description: string;
   amount: number;
+  description: string;
+  date: string;
   type: 'income' | 'expense';
-  categories: { name: string } | null;
-  accounts: { name: string } | null;
+  payment_method: string | null;
 }
 
 interface Budget {
@@ -27,261 +18,97 @@ interface Budget {
   name: string;
   amount: number;
   period: string;
-  category_id: string | null;
   alert_threshold: number;
-  categories: { name: string } | null;
 }
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [showIncomeModal, setShowIncomeModal] = useState(false);
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [budgetSpending, setBudgetSpending] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', { 
-      month: 'long', 
-      year: 'numeric' 
-    });
-  };
-
-  const isCurrentMonth = () => {
-    const now = new Date();
-    return currentMonth.getFullYear() === now.getFullYear() && 
-           currentMonth.getMonth() === now.getMonth();
-  };
-
-  const goToPreviousMonth = () => {
-    setCurrentMonth(prev => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() - 1);
-      return newDate;
-    });
-  };
-
-  const goToNextMonth = () => {
-    setCurrentMonth(prev => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() + 1);
-      return newDate;
-    });
-  };
-
-  const goToCurrentMonth = () => {
-    setCurrentMonth(new Date());
-  };
+  const [income, setIncome] = useState(0);
+  const [expenses, setExpenses] = useState(0);
+  const [budgetStatus, setBudgetStatus] = useState<{ id: string; name: string; status: 'ok' | 'warning' | 'critical' }[]>([]);
+  const [showAllBudgets, setShowAllBudgets] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      fetchData();
+    if (transactions.length > 0) {
+      const totalIncome = transactions
+        .filter((transaction) => transaction.type === 'income')
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
+      setIncome(totalIncome);
+
+      const totalExpenses = transactions
+        .filter((transaction) => transaction.type === 'expense')
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
+      setExpenses(totalExpenses);
     }
-  }, [user]);
+  }, [transactions]);
 
   useEffect(() => {
     if (budgets.length > 0) {
-      fetchBudgetSpending();
+      const calculateBudgetStatus = () => {
+        return budgets.map((budget) => {
+          const totalSpent = transactions
+            .filter((transaction) => transaction.type === 'expense')
+            .filter((transaction) => transaction.category_id === budget.category_id)
+            .reduce((sum, transaction) => sum + transaction.amount, 0);
+
+          const percentageSpent = (totalSpent / budget.amount) * 100;
+
+          let status: 'ok' | 'warning' | 'critical' = 'ok';
+          if (percentageSpent > budget.alert_threshold) {
+            status = 'warning';
+          }
+          if (percentageSpent > 100) {
+            status = 'critical';
+          }
+
+          return {
+            id: budget.id,
+            name: budget.name,
+            status: status,
+          };
+        });
+      };
+
+      setBudgetStatus(calculateBudgetStatus());
     }
-  }, [budgets]);
+  }, [budgets, transactions]);
 
   useEffect(() => {
-    filterTransactionsByMonth();
-  }, [transactions, currentMonth]);
-
-  const getDateRange = (period: string) => {
-    const now = new Date();
-    let startDate: Date;
-    let endDate: Date = new Date(now);
-
-    switch (period) {
-      case 'current_month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
-      case 'last_month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      case 'current_quarter':
-        const quarterStart = Math.floor(now.getMonth() / 3) * 3;
-        startDate = new Date(now.getFullYear(), quarterStart, 1);
-        endDate = new Date(now.getFullYear(), quarterStart + 3, 0);
-        break;
-      case 'last_quarter':
-        const lastQuarterStart = Math.floor(now.getMonth() / 3) * 3 - 3;
-        if (lastQuarterStart < 0) {
-          startDate = new Date(now.getFullYear() - 1, 9, 1); // Q4 do ano anterior
-          endDate = new Date(now.getFullYear() - 1, 12, 0);
-        } else {
-          startDate = new Date(now.getFullYear(), lastQuarterStart, 1);
-          endDate = new Date(now.getFullYear(), lastQuarterStart + 3, 0);
-        }
-        break;
-      case 'current_year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31);
-        break;
-      case 'last_year':
-        startDate = new Date(now.getFullYear() - 1, 0, 1);
-        endDate = new Date(now.getFullYear() - 1, 11, 31);
-        break;
-      case 'last_30_days':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        endDate = now;
-        break;
-      case 'last_90_days':
-        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        endDate = now;
-        break;
-      case 'all_time':
-      default:
-        return null; // Retorna null para indicar que não há filtro
+    if (user) {
+      fetchTransactions();
+      fetchBudgets();
     }
+  }, [user]);
 
-    return { startDate, endDate };
-  };
-
-  const filterTransactionsByMonth = () => {
-    const currentYear = currentMonth.getFullYear();
-    const currentMonthIndex = currentMonth.getMonth();
+  const fetchTransactions = async () => {
+    if (!user) return;
     
-    const filtered = transactions.filter(transaction => {
-      // Filtro por mês sem problemas de fuso horário
-      const [year, month, day] = transaction.date.split('-').map(Number);
-      return year === currentYear && (month - 1) === currentMonthIndex;
-    });
-
-    setFilteredTransactions(filtered);
-  };
-
-  const fetchBudgetSpending = async () => {
-    if (!user || budgets.length === 0) return;
-
-    try {
-      const spendingData: Record<string, number> = {};
-      const currentMonth = new Date();
-      
-      for (const budget of budgets) {
-        if (!budget.category_id) continue;
-
-        // Calculate date range based on budget period and current month
-        let startDate: Date;
-        let endDate: Date;
-        
-        switch (budget.period) {
-          case 'weekly':
-            // For weekly budgets, use the current week of the selected month
-            startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), currentMonth.getDate() - 7);
-            endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), currentMonth.getDate());
-            break;
-          case 'monthly':
-            // For monthly budgets, use the selected month
-            startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-            endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-            break;
-          case 'quarterly':
-            // For quarterly budgets, use the quarter of the selected month
-            const quarterStart = Math.floor(currentMonth.getMonth() / 3) * 3;
-            startDate = new Date(currentMonth.getFullYear(), quarterStart, 1);
-            endDate = new Date(currentMonth.getFullYear(), quarterStart + 3, 0);
-            break;
-          case 'yearly':
-            // For yearly budgets, use the year of the selected month
-            startDate = new Date(currentMonth.getFullYear(), 0, 1);
-            endDate = new Date(currentMonth.getFullYear(), 11, 31);
-            break;
-          default:
-            startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-            endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-        }
-
-        // Fetch transactions for this category and period
-        const { data: transactions, error } = await supabase
-          .from('transactions')
-          .select('amount')
-          .eq('user_id', user.id)
-          .eq('category_id', budget.category_id)
-          .eq('type', 'expense')
-          .gte('date', startDate.toISOString().split('T')[0])
-          .lte('date', endDate.toISOString().split('T')[0]);
-
-        if (error) throw error;
-
-        const totalSpent = transactions?.reduce((sum, transaction) => sum + Number(transaction.amount), 0) || 0;
-        spendingData[budget.id] = totalSpent;
-      }
-
-      setBudgetSpending(spendingData);
-    } catch (error) {
-      console.error('Error fetching budget spending:', error);
-    }
-  };
-
-  const getBudgetProgress = (budget: Budget) => {
-    const spent = budgetSpending[budget.id] || 0;
-    const percentage = (spent / budget.amount) * 100;
-    return {
-      spent,
-      percentage: Math.min(percentage, 100),
-      isOverBudget: percentage > 100,
-      isNearLimit: percentage >= budget.alert_threshold
-    };
-  };
-
-  const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch ALL transactions for calculations (not limited)
-      const { data: allTransactionsData, error: allTransactionsError } = await supabase
+      const currentDate = new Date();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+      const { data, error } = await supabase
         .from('transactions')
-        .select(`
-          id,
-          date,
-          description,
-          amount,
-          type,
-          categories(name),
-          accounts(name)
-        `)
-        .eq('user_id', user?.id)
+        .select('id, amount, description, date, type, payment_method')
+        .eq('user_id', user.id)
+        .gte('date', firstDayOfMonth.toISOString().split('T')[0])
+        .lte('date', lastDayOfMonth.toISOString().split('T')[0])
         .order('date', { ascending: false });
 
-      if (allTransactionsError) throw allTransactionsError;
-
-      // Fetch budgets
-      const { data: budgetsData, error: budgetsError } = await supabase
-        .from('budgets')
-        .select(`
-          id,
-          name,
-          amount,
-          period,
-          category_id,
-          alert_threshold,
-          categories(name)
-        `)
-        .eq('user_id', user?.id);
-
-      if (budgetsError) throw budgetsError;
-
-      // Type assertion for transactions to ensure proper typing
-      const typedTransactions = (allTransactionsData || []).map(t => ({
-        ...t,
-        type: t.type as 'income' | 'expense'
-      }));
-
-      setTransactions(typedTransactions);
-      setBudgets(budgetsData || []);
+      if (error) throw error;
+      setTransactions(data || []);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching transactions:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar dados",
+        description: "Erro ao carregar transações",
         variant: "destructive"
       });
     } finally {
@@ -289,219 +116,91 @@ const Dashboard = () => {
     }
   };
 
-  // Calculate totals using filtered transactions
-  const totalIncome = filteredTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const fetchBudgets = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('budgets')
+        .select('id, name, amount, period, alert_threshold')
+        .eq('user_id', user.id);
 
-  const totalExpenses = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+      if (error) throw error;
+      setBudgets(data || []);
+    } catch (error) {
+      console.error('Error fetching budgets:', error);
+    }
+  };
 
-  // Calculate total installments (parcelas) for the month
-  const totalInstallments = filteredTransactions
-    .filter(t => t.description.includes('(') && t.description.includes('/') && t.description.includes(')'))
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const balance = income - expenses;
 
-  const balance = totalIncome - totalExpenses;
-
-  // Calculate expenses by category using filtered transactions
-  const expensesByCategory = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, t) => {
-      const category = t.categories?.name || 'Outros';
-      acc[category] = (acc[category] || 0) + Number(t.amount);
-      return acc;
-    }, {} as Record<string, number>);
-
-  const categories = Object.entries(expensesByCategory).map(([name, value]) => ({
-    name,
-    value
-  }));
-
-  if (loading) {
-    return <div className="p-6">Carregando...</div>;
-  }
+  const displayedBudgets = showAllBudgets ? budgets : budgets.slice(0, 3);
 
   return (
     <div className="p-6">
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          {/* Navegação por Mês */}
-          <div className="flex items-center space-x-4 bg-white rounded-lg border border-gray-200 px-4 py-2 shadow-sm">
-            <button
-              onClick={goToPreviousMonth}
-              className="p-1 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
-              title="Mês anterior"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            
-            <div className="flex items-center space-x-2">
-              <span className="text-lg font-semibold text-gray-900 min-w-[180px] text-center">
-                {formatMonthYear(currentMonth)}
-              </span>
-              {!isCurrentMonth() && (
-                <button
-                  onClick={goToCurrentMonth}
-                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
-                >
-                  Hoje
-                </button>
-              )}
-            </div>
-            
-            <button
-              onClick={goToNextMonth}
-              className="p-1 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
-              title="Próximo mês"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+        <p className="text-gray-600">Visão geral das suas finanças</p>
+      </div>
 
-          {/* Saldo do Mês */}
-          <div className="text-right">
-            <p className="text-sm text-gray-600">SALDO DO MÊS</p>
-            <p className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white shadow rounded-lg p-4">
+          <div className="flex items-center mb-2">
+            <TrendingUp className="text-green-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-800">Receitas</h2>
           </div>
+          <p className="text-2xl text-gray-900">R$ {income.toFixed(2)}</p>
+        </div>
+
+        <div className="bg-white shadow rounded-lg p-4">
+          <div className="flex items-center mb-2">
+            <TrendingDown className="text-red-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-800">Despesas</h2>
+          </div>
+          <p className="text-2xl text-gray-900">R$ {expenses.toFixed(2)}</p>
+        </div>
+
+        <div className="bg-white shadow rounded-lg p-4">
+          <div className="flex items-center mb-2">
+            <DollarSign className="text-blue-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-800">Saldo</h2>
+          </div>
+          <p className="text-2xl text-gray-900">R$ {balance.toFixed(2)}</p>
         </div>
       </div>
 
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-            <div>
-              <p className="text-sm text-gray-600">Receita</p>
-              <p className="text-xl font-bold text-gray-900">
-                R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
-            <div>
-              <p className="text-sm text-gray-600">Despesas</p>
-              <p className="text-xl font-bold text-gray-900">
-                R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-            <div>
-              <p className="text-sm text-gray-600">Total Parcelado</p>
-              <p className="text-xl font-bold text-gray-900">
-                R$ {totalInstallments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
-            <div>
-              <p className="text-sm text-gray-600">Orçamentos</p>
-              <p className="text-xl font-bold text-gray-900">{budgets.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Orçamentos</h2>
+        {displayedBudgets.map((budget) => {
+          const status = budgetStatus.find((s) => s.id === budget.id)?.status || 'ok';
+          let statusColor = 'text-green-500';
+          if (status === 'warning') statusColor = 'text-yellow-500';
+          if (status === 'critical') statusColor = 'text-red-500';
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Gastos por Categoria */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Gastos por Categoria</h3>
-          <div className="space-y-3">
-            {categories.length > 0 ? (
-              categories.map((category, index) => (
-                <div key={index} className="flex justify-between items-center">
-                  <span className="text-gray-700">{category.name}</span>
-                  <span className="text-gray-900 font-medium">
-                    R$ {category.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
+          return (
+            <div key={budget.id} className="bg-white shadow rounded-lg p-4 mb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">{budget.name}</h3>
+                  <p className="text-gray-600">Meta: R$ {budget.amount.toFixed(2)}</p>
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500">Nenhuma despesa encontrada</p>
-            )}
-          </div>
-        </div>
-
-        {/* Orçamentos */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Orçamentos</h3>
-          <div className="space-y-4">
-            {budgets.length > 0 ? (
-              budgets.map((budget) => {
-                const progress = getBudgetProgress(budget);
-                return (
-                  <div key={budget.id}>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-700">{budget.name}</span>
-                      <div className="text-right">
-                        <span className="text-gray-900 font-medium text-sm">
-                          R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / 
-                          R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
-                      <div 
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          progress.isOverBudget 
-                            ? 'bg-red-500' 
-                            : progress.isNearLimit 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
-                        }`}
-                        style={{ width: `${Math.min(progress.percentage, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between items-center text-xs text-gray-500">
-                      <span>{progress.percentage.toFixed(1)}% usado</span>
-                      <span className="capitalize">{budget.period}</span>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-gray-500">Nenhum orçamento criado</p>
-            )}
-          </div>
-        </div>
+                <div className={`flex items-center ${statusColor}`}>
+                  <Target className="mr-1" size={16} />
+                  <span className="text-sm font-medium">{status.toUpperCase()}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {budgets.length > 3 && (
+          <button
+            onClick={() => setShowAllBudgets(!showAllBudgets)}
+            className="text-blue-500 hover:underline"
+          >
+            {showAllBudgets ? 'Ver Menos' : 'Ver Todos'}
+          </button>
+        )}
       </div>
-
-
-
-      {/* Modais */}
-      <AddTransactionModal 
-        isOpen={showIncomeModal}
-        onClose={() => setShowIncomeModal(false)}
-        onSuccess={fetchData}
-        type="income"
-      />
-      <AddTransactionModal 
-        isOpen={showExpenseModal}
-        onClose={() => setShowExpenseModal(false)}
-        onSuccess={fetchData}
-        type="expense"
-      />
     </div>
   );
 };
