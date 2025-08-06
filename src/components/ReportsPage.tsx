@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { Download, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
-import { Calendar, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -19,31 +18,60 @@ interface Transaction {
   };
 }
 
+interface CategoryExpense {
+  name: string;
+  amount: number;
+  color: string;
+  percentage: number;
+}
+
 const ReportsPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
-  const [startDate, setStartDate] = useState(() => {
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    return firstDayOfMonth.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
-  });
+  const [selectedPeriod, setSelectedPeriod] = useState('current_month');
+  const [reportType, setReportType] = useState('expenses_by_category');
 
   useEffect(() => {
     if (user) {
       fetchTransactions();
     }
-  }, [user, startDate, endDate]);
+  }, [user, selectedPeriod]);
+
+  const getDateRange = () => {
+    const today = new Date();
+    let startDate: Date;
+    let endDate: Date = today;
+
+    switch (selectedPeriod) {
+      case 'current_month':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'last_month':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        break;
+      case 'current_year':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    return {
+      start: startDate.toISOString().split('T')[0],
+      end: endDate.toISOString().split('T')[0]
+    };
+  };
 
   const fetchTransactions = async () => {
     if (!user) return;
     
     setLoading(true);
     try {
+      const { start, end } = getDateRange();
+      
       const { data, error } = await supabase
         .from('transactions')
         .select(`
@@ -56,12 +84,11 @@ const ReportsPage = () => {
           categories:category_id(name, color)
         `)
         .eq('user_id', user.id)
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('date', start)
+        .lte('date', end)
         .order('date', { ascending: false });
 
       if (error) throw error;
-      // Type assertion to ensure proper typing
       setTransactions((data || []).map(transaction => ({
         ...transaction,
         type: transaction.type as 'income' | 'expense'
@@ -86,153 +113,203 @@ const ReportsPage = () => {
   const expenseTotal = calculateTotal('expense');
   const balance = incomeTotal - expenseTotal;
 
-  const categoryData = () => {
-    const categoryTotals: { [key: string]: number } = {};
+  const getCategoryExpenses = (): CategoryExpense[] => {
+    const categoryTotals: { [key: string]: { amount: number; color: string } } = {};
+    
     transactions.forEach(transaction => {
       if (transaction.type === 'expense' && transaction.categories) {
         const categoryName = transaction.categories.name;
-        categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + transaction.amount;
+        const categoryColor = transaction.categories.color;
+        
+        if (!categoryTotals[categoryName]) {
+          categoryTotals[categoryName] = { amount: 0, color: categoryColor };
+        }
+        categoryTotals[categoryName].amount += transaction.amount;
       }
     });
 
-    return Object.entries(categoryTotals).map(([name, value]) => ({ name, value }));
+    const totalExpenses = Object.values(categoryTotals).reduce((sum, cat) => sum + cat.amount, 0);
+
+    return Object.entries(categoryTotals)
+      .map(([name, data]) => ({
+        name,
+        amount: data.amount,
+        color: data.color,
+        percentage: totalExpenses > 0 ? (data.amount / totalExpenses) * 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount);
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#9cafff', '#d8b4fe'];
+  const exportToCSV = () => {
+    const categoryExpenses = getCategoryExpenses();
+    const csvContent = [
+      ['Categoria', 'Valor', 'Percentual'],
+      ...categoryExpenses.map(cat => [
+        cat.name,
+        `R$ ${cat.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        `${cat.percentage.toFixed(1)}%`
+      ])
+    ].map(row => row.join(',')).join('\n');
 
-  const dailyData = () => {
-    const dailyTotals: { [key: string]: { income: number; expense: number } } = {};
-  
-    transactions.forEach(transaction => {
-      const date = transaction.date;
-      if (!dailyTotals[date]) {
-        dailyTotals[date] = { income: 0, expense: 0 };
-      }
-  
-      if (transaction.type === 'income') {
-        dailyTotals[date].income += transaction.amount;
-      } else {
-        dailyTotals[date].expense += transaction.amount;
-      }
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'relatorio-despesas-categoria.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportToPDF = () => {
+    toast({
+      title: "Em desenvolvimento",
+      description: "Funcionalidade de exportação PDF será implementada em breve",
     });
-  
-    return Object.entries(dailyTotals).map(([date, totals]) => ({
-      date,
-      income: totals.income,
-      expense: totals.expense,
-    }));
   };
+
+  const categoryExpenses = getCategoryExpenses();
 
   return (
-    <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Relatórios</h1>
-        <p className="text-gray-600">Análise detalhada das suas finanças</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white shadow rounded-lg p-4">
-          <div className="flex items-center text-gray-600 mb-2">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Receitas
-          </div>
-          <div className="text-2xl font-bold text-green-500">R$ {incomeTotal.toFixed(2)}</div>
-        </div>
-
-        <div className="bg-white shadow rounded-lg p-4">
-          <div className="flex items-center text-gray-600 mb-2">
-            <TrendingDown className="w-4 h-4 mr-2" />
-            Despesas
-          </div>
-          <div className="text-2xl font-bold text-red-500">R$ {expenseTotal.toFixed(2)}</div>
-        </div>
-
-        <div className="bg-white shadow rounded-lg p-4">
-          <div className="flex items-center text-gray-600 mb-2">
-            <DollarSign className="w-4 h-4 mr-2" />
-            Saldo
-          </div>
-          <div className={`text-2xl font-bold ${balance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            R$ {balance.toFixed(2)}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white shadow rounded-lg p-6 mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Filtrar por período</h2>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center space-x-4">
-          <div>
-            <label htmlFor="start-date" className="block text-sm font-medium text-gray-700">Data de início</label>
-            <div className="relative">
-              <input
-                type="date"
-                id="start-date"
-                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <Calendar className="h-5 w-5 text-gray-400" aria-hidden="true" />
-              </div>
-            </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-green-600">Fin</span>
+            <span className="text-sm font-medium text-gray-600">Control</span>
           </div>
-
-          <div>
-            <label htmlFor="end-date" className="block text-sm font-medium text-gray-700">Data de término</label>
-            <div className="relative">
-              <input
-                type="date"
-                id="end-date"
-                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <Calendar className="h-5 w-5 text-gray-400" aria-hidden="true" />
-              </div>
-            </div>
-          </div>
+          <h1 className="text-xl font-semibold text-gray-900">Relatórios</h1>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Despesas por Categoria</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={categoryData()}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                fill="#8884d8"
-                label
+      <div className="p-6">
+        {/* Filtros de Relatório */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros de Relatório</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">PERÍODO:</label>
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               >
-                {
-                  categoryData().map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))
-                }
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+                <option value="current_month">Mês Atual</option>
+                <option value="last_month">Mês Anterior</option>
+                <option value="current_year">Ano Atual</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">TIPO DE RELATÓRIO:</label>
+              <select
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="expenses_by_category">Despesas por Categoria</option>
+                <option value="income_by_category">Receitas por Categoria</option>
+                <option value="monthly_summary">Resumo Mensal</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Receitas vs Despesas Diárias</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={dailyData()}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="income" stroke="#82ca9d" strokeWidth={2} name="Receitas" />
-              <Line type="monotone" dataKey="expense" stroke="#e57373" strokeWidth={2} name="Despesas" />
-            </LineChart>
-          </ResponsiveContainer>
+        {/* Resumo do Período */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Resumo do Período</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                <span className="text-sm font-medium text-gray-700">Receitas</span>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">
+                R$ {incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                <span className="text-sm font-medium text-gray-700">Despesas</span>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">
+                R$ {expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                <span className="text-sm font-medium text-gray-700">Saldo</span>
+              </div>
+              <div className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, signDisplay: 'always' })}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-blue-600">
+              Relatório gerado para: {selectedPeriod === 'current_month' ? 'Mês Atual' : selectedPeriod === 'last_month' ? 'Mês Anterior' : 'Ano Atual'} - Despesas por Categoria
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={exportToCSV}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 flex items-center gap-1"
+              >
+                <Download className="w-4 h-4" />
+                CSV
+              </button>
+              <button
+                onClick={exportToPDF}
+                className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 flex items-center gap-1"
+              >
+                <FileText className="w-4 h-4" />
+                PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Despesas por Categoria */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Despesas por Categoria</h2>
+          
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Carregando relatório...</div>
+          ) : categoryExpenses.length > 0 ? (
+            <div className="space-y-4">
+              {categoryExpenses.map((category, index) => (
+                <div key={index} className="flex items-center">
+                  <div className="w-24 text-sm text-gray-700 font-medium">
+                    {category.name}
+                  </div>
+                  <div className="flex-1 mx-4">
+                    <div className="w-full bg-gray-200 rounded-full h-6 relative">
+                      <div
+                        className="h-6 rounded-full transition-all duration-300"
+                        style={{
+                          backgroundColor: category.color,
+                          width: `${category.percentage}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="w-32 text-right">
+                    <div className="text-sm font-semibold text-gray-900">
+                      R$ {category.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {category.percentage.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma despesa encontrada para o período selecionado
+            </div>
+          )}
         </div>
       </div>
     </div>
