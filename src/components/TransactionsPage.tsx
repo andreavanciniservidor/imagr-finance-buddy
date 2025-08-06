@@ -204,166 +204,265 @@ const TransactionsPage = () => {
     return method ? methods[method] || method : '-';
   };
 
+  const [showFilters, setShowFilters] = useState(false);
+  const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium text-green-600">Fin</span>
-              <span className="text-sm font-medium text-gray-600">Control</span>
-            </div>
-            <h1 className="text-xl font-semibold text-gray-900">Transações</h1>
-          </div>
+      <div className="p-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Transações</h1>
           
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => navigateMonth('prev')}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <ChevronLeft className="w-4 h-4 text-gray-600" />
-              </button>
-              <span className="text-sm font-medium text-gray-700 min-w-[120px] text-center">
+          {/* Month Navigation */}
+          <div className="flex items-center justify-center mb-6">
+            <button
+              onClick={() => navigateMonth('prev')}
+              className="p-2 hover:bg-gray-100 rounded"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div className="flex items-center space-x-2 mx-8">
+              <span className="text-base font-medium text-gray-900">
                 {monthNames[currentDate.getMonth()]} de {currentDate.getFullYear()}
               </span>
               <button
-                onClick={() => navigateMonth('next')}
-                className="p-1 hover:bg-gray-100 rounded"
+                onClick={goToToday}
+                className="text-sm bg-blue-100 text-blue-600 px-3 py-1 rounded hover:bg-blue-200 font-medium"
               >
-                <ChevronRight className="w-4 h-4 text-gray-600" />
+                Hoje
+              </button>
+            </div>
+            <button
+              onClick={() => navigateMonth('next')}
+              className="p-2 hover:bg-gray-100 rounded"
+            >
+              <ChevronRight className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center gap-2 text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                AdicionarReceita
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 flex items-center gap-2 text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                AdicionarDespesa
               </button>
             </div>
             
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center gap-2 text-sm font-medium"
             >
-              <Plus className="w-4 h-4" />
-              Add
+              <Filter className="w-4 h-4" />
+              Filtros
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="p-6">
-        {/* Filters */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Buscar transação..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+        {/* Transactions Section */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Transações</h2>
+          </div>
+
+          {/* Filters Section */}
+          {showFilters && (
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                  <input
+                    type="text"
+                    placeholder="Descrição da transação..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                  <select
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                  >
+                    <option value="">Todas as categorias</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pagamento</label>
+                  <select
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    value={selectedPaymentMethod}
+                    onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                  >
+                    <option value="">Todos os métodos</option>
+                    <option value="cash">Dinheiro</option>
+                    <option value="debit_card">Cartão Débito</option>
+                    <option value="credit_card">Cartão Crédito</option>
+                    <option value="pix">PIX</option>
+                    <option value="bank_transfer">Transferência</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                  <select
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense')}
+                  >
+                    <option value="all">Todos os tipos</option>
+                    <option value="income">Receita</option>
+                    <option value="expense">Despesa</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    placeholder="dd/mm/aaaa"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    placeholder="dd/mm/aaaa"
+                  />
+                </div>
               </div>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <select
-                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense')}
-              >
-                <option value="all">Todos</option>
-                <option value="income">Receitas</option>
-                <option value="expense">Despesas</option>
-              </select>
-
-              <select
-                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-              >
-                <option value="">Todas Categorias</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Transactions Table */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          )}
+          
           {loading ? (
             <div className="text-center py-8 text-gray-500">Carregando transações...</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      DATA
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Descrição
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      DESCRIÇÃO
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Categoria
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      CATEGORIA
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Conta
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      MÉTODO DE PAGAMENTO
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Método
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      TIPO
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      VALOR
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      AÇÕES
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {filteredTransactions.map((transaction, index) => (
-                    <tr key={transaction.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(transaction.date)}
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredTransactions.map((transaction) => (
+                    <tr key={transaction.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {new Date(transaction.date).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        <div className="max-w-xs truncate">
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="max-w-xs">
                           {transaction.description}
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {transaction.categories?.name || '-'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        {transaction.accounts?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {getPaymentMethodDisplay(transaction.payment_method)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium">
-                        <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                          {transaction.type === 'income' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          transaction.type === 'income' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {transaction.type === 'income' ? 'Receita' : 'Despesa'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedTransaction(transaction);
-                              setShowEditModal(true);
-                            }}
-                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(transaction.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                        <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                          - R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center relative">
+                        <button
+                          onClick={() => setShowActionMenu(showActionMenu === transaction.id ? null : transaction.id)}
+                          className="text-gray-400 hover:text-gray-600 text-lg"
+                        >
+                          ⋯
+                        </button>
+                        {showActionMenu === transaction.id && (
+                          <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                            <button
+                              onClick={() => {
+                                setSelectedTransaction(transaction);
+                                setShowEditModal(true);
+                                setShowActionMenu(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDelete(transaction.id);
+                                setShowActionMenu(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Excluir
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -377,17 +476,22 @@ const TransactionsPage = () => {
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma transação encontrada</h3>
                   <p className="text-gray-600 mb-4">
-                    {searchTerm || filterType !== 'all' || filterCategory 
-                      ? 'Tente ajustar os filtros para ver mais resultados'
-                      : 'Comece adicionando sua primeira transação'
-                    }
+                    Comece adicionando sua primeira transação
                   </p>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                  >
-                    Adicionar Transação
-                  </button>
+                  <div className="flex items-center justify-center space-x-3">
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+                    >
+                      Adicionar Receita
+                    </button>
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
+                    >
+                      Adicionar Despesa
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
