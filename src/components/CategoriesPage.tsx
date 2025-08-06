@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Palette } from 'lucide-react';
+import { Plus, Edit2, Trash2, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
@@ -19,9 +19,10 @@ const CategoriesPage = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense');
   const [formData, setFormData] = useState({
     name: '',
-    type: 'income' as 'income' | 'expense',
+    type: 'expense' as 'income' | 'expense',
     color: '#3B82F6',
   });
 
@@ -175,11 +176,11 @@ const CategoriesPage = () => {
     }
   };
 
-  const openModal = () => {
+  const openModal = (type?: 'income' | 'expense') => {
     setShowModal(true);
     setFormData({
       name: '',
-      type: 'income',
+      type: type || activeTab,
       color: '#3B82F6',
     });
     setEditingCategory(null);
@@ -190,78 +191,122 @@ const CategoriesPage = () => {
     setEditingCategory(null);
   };
 
+  const filteredCategories = categories.filter(category => category.type === activeTab);
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Categorias</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Categoria
-        </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium text-green-600">Fin</span>
+              <span className="text-sm font-medium text-gray-600">Control</span>
+            </div>
+            <h1 className="text-xl font-semibold text-gray-900">Categorias</h1>
+          </div>
+          
+          <button
+            onClick={() => openModal()}
+            className="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-2 text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Categoria
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <p>Carregando categorias...</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nome
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cor
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {categories.map((category) => (
-                <tr key={category.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {category.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {category.type === 'income' ? 'Receita' : 'Despesa'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <span
-                        className="block w-3 h-3 rounded-full mr-2"
-                        style={{ backgroundColor: category.color }}
-                      ></span>
-                      {category.color}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(category)}
-                      className="text-blue-500 hover:text-blue-700 mr-2"
-                    >
-                      <Edit2 className="w-4 h-4 inline-block" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(category.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4 inline-block" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="p-6">
+        {/* Tabs */}
+        <div className="flex space-x-1 mb-6">
+          <button
+            onClick={() => setActiveTab('expense')}
+            className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+              activeTab === 'expense'
+                ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Despesas
+          </button>
+          <button
+            onClick={() => setActiveTab('income')}
+            className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+              activeTab === 'income'
+                ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Receitas
+          </button>
         </div>
-      )}
+
+        {/* Categories Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Categorias de {activeTab === 'expense' ? 'Despesas' : 'Receitas'}
+          </h2>
+
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Carregando categorias...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCategories.map((category) => (
+                <div
+                  key={category.id}
+                  className="rounded-lg p-4 text-white relative overflow-hidden"
+                  style={{ backgroundColor: category.color }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-white">{category.name}</h3>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleEdit(category)}
+                        className="p-1 text-white hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(category.id)}
+                        className="p-1 text-white hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center text-white text-opacity-90">
+                    <Tag className="w-4 h-4 mr-2" />
+                    <span className="text-sm">
+                      {category.type === 'income' ? 'Receita' : 'Despesa'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {filteredCategories.length === 0 && !loading && (
+                <div className="col-span-full text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Tag className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Nenhuma categoria de {activeTab === 'expense' ? 'despesa' : 'receita'} encontrada
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Comece criando sua primeira categoria para organizar suas transações
+                  </p>
+                  <button
+                    onClick={() => openModal(activeTab)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                  >
+                    Criar Primeira Categoria
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Modal */}
       {showModal && (
