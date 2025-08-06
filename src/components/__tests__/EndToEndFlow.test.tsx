@@ -1,10 +1,12 @@
+
 /**
  * End-to-end tests for complete transaction flow with improved calculations
  * Tests the full user journey from cartao creation to transaction processing
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FaturaCalculator } from '@/lib/faturaCalculator';
 import { CartaoExtended } from '@/types/cartao';
