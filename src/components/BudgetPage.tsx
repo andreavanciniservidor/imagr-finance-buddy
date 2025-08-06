@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Target, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
@@ -11,6 +11,10 @@ interface Budget {
   category_id: string | null;
   period: string;
   alert_threshold: number;
+  categories?: {
+    name: string;
+    color: string;
+  };
 }
 
 interface Category {
@@ -19,14 +23,24 @@ interface Category {
   color: string;
 }
 
+interface Transaction {
+  id: string;
+  amount: number;
+  category_id: string | null;
+  type: 'income' | 'expense';
+  date: string;
+}
+
 const BudgetPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const [formState, setFormState] = useState({
     name: '',
@@ -36,12 +50,18 @@ const BudgetPage = () => {
     alert_threshold: 80
   });
 
+  const monthNames = [
+    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+  ];
+
   useEffect(() => {
     if (user) {
       fetchBudgets();
       fetchCategories();
+      fetchTransactions();
     }
-  }, [user]);
+  }, [user, currentDate]);
 
   const fetchBudgets = async () => {
     if (!user) return;
@@ -50,7 +70,10 @@ const BudgetPage = () => {
     try {
       const { data, error } = await supabase
         .from('budgets')
-        .select('id, name, amount, category_id, period, alert_threshold')
+        .select(`
+          id, name, amount, category_id, period, alert_threshold,
+          categories (name, color)
+        `)
         .eq('user_id', user.id)
         .order('name');
 
@@ -82,6 +105,28 @@ const BudgetPage = () => {
       setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    if (!user) return;
+    
+    try {
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, amount, category_id, type, date')
+        .eq('user_id', user.id)
+        .eq('type', 'expense')
+        .gte('date', firstDayOfMonth.toISOString().split('T')[0])
+        .lte('date', lastDayOfMonth.toISOString().split('T')[0]);
+
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
     }
   };
 
@@ -221,92 +266,215 @@ const BudgetPage = () => {
     });
   };
 
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    if (direction === 'prev') {
+      newDate.setMonth(newDate.getMonth() - 1);
+    } else {
+      newDate.setMonth(newDate.getMonth() + 1);
+    }
+    setCurrentDate(newDate);
+  };
+
+  const getBudgetProgress = (budget: Budget) => {
+    const categoryTransactions = transactions.filter(
+      t => t.category_id === budget.category_id
+    );
+    const spent = categoryTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const percentage = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
+    
+    return {
+      spent,
+      percentage: Math.min(percentage, 100),
+      isOverBudget: percentage > 100,
+      isNearLimit: percentage > budget.alert_threshold
+    };
+  };
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Orçamentos</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Orçamento
-        </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium text-green-600">Fin</span>
+              <span className="text-sm font-medium text-gray-600">Control</span>
+            </div>
+            <h1 className="text-xl font-semibold text-gray-900">Orçamentos</h1>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => navigateMonth('prev')}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-600" />
+              </button>
+              <span className="text-sm font-medium text-gray-700 min-w-[120px] text-center">
+                {monthNames[currentDate.getMonth()]} de {currentDate.getFullYear()}
+              </span>
+              <button
+                onClick={() => navigateMonth('next')}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+            
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Create New Orçamento
+            </button>
+          </div>
+        </div>
       </div>
 
-      {loading && <div className="text-center">Carregando...</div>}
+      <div className="p-6">
+        {/* Orçamentos Ativos Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Orçamentos Ativos</h2>
+          
+          {loading && (
+            <div className="text-center py-8 text-gray-500">Carregando...</div>
+          )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full leading-normal">
-          <thead>
-            <tr>
-              <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Nome
-              </th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Valor
-              </th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Categoria
-              </th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Período
-              </th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Alerta (%)
-              </th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {budgets.map((budget) => (
-              <tr key={budget.id}>
-                <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                  <p className="text-gray-900 whitespace-no-wrap">{budget.name}</p>
-                </td>
-                <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                  <p className="text-gray-900 whitespace-no-wrap">R$ {budget.amount.toFixed(2)}</p>
-                </td>
-                <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                  {budget.category_id ? (
-                    categories.find(cat => cat.id === budget.category_id)?.name || 'N/A'
-                  ) : (
-                    <p className="text-gray-500">Sem categoria</p>
+          <div className="space-y-6">
+            {budgets.map((budget) => {
+              const progress = getBudgetProgress(budget);
+              const categoryName = budget.categories?.name || 'Categoria não definida';
+              
+              // Determine colors based on progress
+              let progressBarColor = 'bg-green-500';
+              let statusColor = 'text-green-600';
+              let statusText = 'Dentro do orçamento';
+              let statusBg = 'bg-green-50';
+              
+              if (progress.isOverBudget) {
+                progressBarColor = 'bg-red-500';
+                statusColor = 'text-red-600';
+                statusText = 'Orçamento excedido';
+                statusBg = 'bg-red-50';
+              } else if (progress.isNearLimit) {
+                progressBarColor = 'bg-yellow-500';
+                statusColor = 'text-yellow-600';
+                statusText = 'Próximo do limite';
+                statusBg = 'bg-yellow-50';
+              }
+
+              return (
+                <div key={budget.id} className="bg-white rounded-lg border border-gray-200 p-6">
+                  {/* Budget Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{budget.name}</h3>
+                      <p className="text-sm text-gray-600">Categoria: {categoryName}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-semibold text-gray-900">
+                        R$ {budget.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-sm text-gray-500 capitalize">{budget.period}</div>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>
+                        R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / 
+                        R$ {budget.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span>{progress.percentage.toFixed(1)}% usado</span>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className={`h-3 rounded-full transition-all duration-300 ${progressBarColor}`}
+                        style={{ width: `${progress.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status and Actions */}
+                  <div className="flex items-center justify-between">
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor} ${statusBg}`}>
+                      {progress.isOverBudget && <AlertTriangle className="w-3 h-3 inline mr-1" />}
+                      {!progress.isOverBudget && !progress.isNearLimit && <CheckCircle className="w-3 h-3 inline mr-1" />}
+                      {statusText}
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => startEditing(budget)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteBudget(budget.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Additional Info */}
+                  {progress.isOverBudget && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center">
+                        <AlertTriangle className="w-4 h-4 text-red-500 mr-2" />
+                        <span className="text-sm text-red-700">
+                          Orçamento Excedido
+                        </span>
+                      </div>
+                      <p className="text-xs text-red-600 mt-1">
+                        Você excedeu seu orçamento em R$ {(progress.spent - budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. 
+                        Considere revisar seus gastos nesta categoria.
+                      </p>
+                    </div>
                   )}
-                </td>
-                <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                  <p className="text-gray-900 whitespace-no-wrap">{budget.period === 'monthly' ? 'Mensal' : 'Anual'}</p>
-                </td>
-                <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                  <div className="flex items-center">
-                    {budget.alert_threshold < 80 && (
-                      <AlertTriangle className="w-4 h-4 text-yellow-500 mr-1" />
-                    )}
-                    <p className="text-gray-900 whitespace-no-wrap">{budget.alert_threshold}%</p>
-                  </div>
-                </td>
-                <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => startEditing(budget)}
-                      className="text-blue-500 hover:text-blue-700"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => deleteBudget(budget.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+                  {progress.isNearLimit && !progress.isOverBudget && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-center">
+                        <AlertTriangle className="w-4 h-4 text-yellow-500 mr-2" />
+                        <span className="text-sm text-yellow-700">
+                          Próximo do Limite
+                        </span>
+                      </div>
+                      <p className="text-xs text-yellow-600 mt-1">
+                        Você está próximo do seu limite de orçamento. 
+                        Restam R$ {(budget.amount - progress.spent).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para este período.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {budgets.length === 0 && !loading && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <Plus className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum orçamento criado</h3>
+                <p className="text-gray-600 mb-4">Comece criando seu primeiro orçamento para controlar seus gastos</p>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Criar Primeiro Orçamento
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Modal */}
@@ -318,7 +486,7 @@ const BudgetPage = () => {
                 {editingBudget ? 'Editar Orçamento' : 'Novo Orçamento'}
               </h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
-                X
+                ✕
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -344,6 +512,7 @@ const BudgetPage = () => {
                   type="number"
                   id="amount"
                   name="amount"
+                  step="0.01"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                   value={formState.amount}
                   onChange={handleInputChange}
@@ -411,7 +580,7 @@ const BudgetPage = () => {
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                   disabled={loading}
                 >
                   {loading ? 'Salvando...' : 'Salvar'}
