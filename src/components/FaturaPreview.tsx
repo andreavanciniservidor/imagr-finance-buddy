@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Calendar, Clock, CreditCard, AlertCircle, Info, TrendingUp } from 'lucide-react';
 import { FaturaCalculator } from '@/lib/faturaCalculator';
 import { CartaoExtended, TransactionPreview } from '@/types/cartao';
@@ -12,24 +12,97 @@ interface FaturaPreviewProps {
   isLoading?: boolean;
 }
 
-const FaturaPreview: React.FC<FaturaPreviewProps> = ({ 
+const FaturaPreview: React.FC<FaturaPreviewProps> = React.memo(({ 
   cartao, 
   purchaseDate, 
   amount,
   className = '',
   isLoading = false
 }) => {
+  // Memoize the parsed purchase date to avoid recalculation
+  const purchaseDateObj = useMemo(() => {
+    if (!purchaseDate) return null;
+    const [year, month, day] = purchaseDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return isNaN(date.getTime()) ? null : date;
+  }, [purchaseDate]);
+
+  // Memoize the transaction preview calculation (expensive operation)
+  const preview = useMemo(() => {
+    if (!cartao || !purchaseDateObj) return null;
+    try {
+      return FaturaCalculator.getTransactionPreview(purchaseDateObj, cartao);
+    } catch (error) {
+      console.warn('Error calculating transaction preview:', error);
+      return null;
+    }
+  }, [cartao, purchaseDateObj]);
+
+  // Memoize formatting functions to avoid recreation on each render
+  const formatCurrency = useMemo(() => {
+    const formatter = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+    return (value: string) => {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue)) return 'R$ 0,00';
+      return formatter.format(numValue);
+    };
+  }, []);
+
+  const formatDate = useMemo(() => {
+    return (date: Date) => {
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    };
+  }, []);
+
+  // Memoize calculated values that depend on preview
+  const calculatedValues = useMemo(() => {
+    if (!preview || !purchaseDateObj) return null;
+
+    const monthsDifference = (preview.dataLancamento.getFullYear() - purchaseDateObj.getFullYear()) * 12 + 
+                             (preview.dataLancamento.getMonth() - purchaseDateObj.getMonth());
+    const isSignificantDelay = monthsDifference > 1;
+
+    const formatPeriod = () => {
+      const inicio = formatDate(preview.periodoFatura.inicio);
+      const fim = formatDate(preview.periodoFatura.fim);
+      return `${inicio} - ${fim}`;
+    };
+
+    const getBackgroundColor = () => {
+      if (preview.isLancamentoPostergado && isSignificantDelay) {
+        return 'bg-orange-50 border-orange-200';
+      } else if (preview.isLancamentoPostergado) {
+        return 'bg-yellow-50 border-yellow-200';
+      }
+      return 'bg-blue-50 border-blue-200';
+    };
+
+    const getHeaderColor = () => {
+      if (preview.isLancamentoPostergado && isSignificantDelay) {
+        return 'text-orange-800';
+      } else if (preview.isLancamentoPostergado) {
+        return 'text-yellow-800';
+      }
+      return 'text-blue-800';
+    };
+
+    return {
+      isSignificantDelay,
+      formatPeriod: formatPeriod(),
+      backgroundColor: getBackgroundColor(),
+      headerColor: getHeaderColor()
+    };
+  }, [preview, purchaseDateObj, formatDate]);
+
   // Don't render if no cartao is selected or invalid date
-  if (!cartao || !purchaseDate) {
-    return null;
-  }
-
-  // Parse the purchase date
-  const [year, month, day] = purchaseDate.split('-').map(Number);
-  const purchaseDateObj = new Date(year, month - 1, day);
-
-  // Validate date
-  if (isNaN(purchaseDateObj.getTime())) {
+  if (!cartao || !purchaseDate || !purchaseDateObj) {
     return null;
   }
 
@@ -50,66 +123,15 @@ const FaturaPreview: React.FC<FaturaPreviewProps> = ({
     );
   }
 
-  // Get transaction preview using FaturaCalculator
-  const preview: TransactionPreview = FaturaCalculator.getTransactionPreview(
-    purchaseDateObj, 
-    cartao
-  );
-
-  // Format currency
-  const formatCurrency = (value: string) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return 'R$ 0,00';
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(numValue);
-  };
-
-  // Format date for display
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  // Format period display
-  const formatPeriod = () => {
-    const inicio = formatDate(preview.periodoFatura.inicio);
-    const fim = formatDate(preview.periodoFatura.fim);
-    return `${inicio} - ${fim}`;
-  };
-
-  // Calculate if launch date is significantly different from purchase date
-  const monthsDifference = (preview.dataLancamento.getFullYear() - purchaseDateObj.getFullYear()) * 12 + 
-                           (preview.dataLancamento.getMonth() - purchaseDateObj.getMonth());
-  const isSignificantDelay = monthsDifference > 1;
-
-  // Determine background color based on launch status
-  const getBackgroundColor = () => {
-    if (preview.isLancamentoPostergado && isSignificantDelay) {
-      return 'bg-orange-50 border-orange-200';
-    } else if (preview.isLancamentoPostergado) {
-      return 'bg-yellow-50 border-yellow-200';
-    }
-    return 'bg-blue-50 border-blue-200';
-  };
-
-  const getHeaderColor = () => {
-    if (preview.isLancamentoPostergado && isSignificantDelay) {
-      return 'text-orange-800';
-    } else if (preview.isLancamentoPostergado) {
-      return 'text-yellow-800';
-    }
-    return 'text-blue-800';
-  };
+  // Don't render if preview calculation failed
+  if (!preview || !calculatedValues) {
+    return null;
+  }
 
   return (
     <TooltipProvider>
-      <div className={`${getBackgroundColor()} rounded-lg p-4 space-y-3 ${className}`}>
-        <div className={`flex items-center gap-2 ${getHeaderColor()} font-medium`}>
+      <div className={`${calculatedValues.backgroundColor} rounded-lg p-4 space-y-3 ${className}`}>
+        <div className={`flex items-center gap-2 ${calculatedValues.headerColor} font-medium`}>
           <CreditCard className="w-4 h-4" />
           <span>Preview do Lançamento</span>
           {preview.isLancamentoPostergado && (
@@ -140,7 +162,7 @@ const FaturaPreview: React.FC<FaturaPreviewProps> = ({
           </div>
           <div className={`font-medium ${preview.isLancamentoPostergado ? 'text-amber-700' : 'text-blue-700'}`}>
             {formatDate(preview.dataLancamento)}
-            {isSignificantDelay && (
+            {calculatedValues.isSignificantDelay && (
               <Tooltip>
                 <TooltipTrigger>
                   <TrendingUp className="w-3 h-3 ml-1 inline text-orange-600" />
@@ -216,7 +238,7 @@ const FaturaPreview: React.FC<FaturaPreviewProps> = ({
             </Tooltip>
           </div>
           <div className="text-xs font-medium text-blue-600">
-            {formatPeriod()}
+            {calculatedValues.formatPeriod}
           </div>
           <div className="text-xs text-gray-500 mt-1">
             {preview.periodoFatura.diasRestantes} dias restantes até fechamento
@@ -226,19 +248,19 @@ const FaturaPreview: React.FC<FaturaPreviewProps> = ({
         {/* Warning for postponed launch */}
         {preview.isLancamentoPostergado && (
           <div className={`flex items-start gap-2 p-2 rounded text-xs ${
-            isSignificantDelay 
+            calculatedValues.isSignificantDelay 
               ? 'bg-orange-50 border border-orange-200' 
               : 'bg-yellow-50 border border-yellow-200'
           }`}>
             <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
-              isSignificantDelay ? 'text-orange-600' : 'text-yellow-600'
+              calculatedValues.isSignificantDelay ? 'text-orange-600' : 'text-yellow-600'
             }`} />
-            <div className={isSignificantDelay ? 'text-orange-800' : 'text-yellow-800'}>
+            <div className={calculatedValues.isSignificantDelay ? 'text-orange-800' : 'text-yellow-800'}>
               <div className="font-medium">
-                {isSignificantDelay ? 'Lançamento com atraso significativo' : 'Lançamento postergado'}
+                {calculatedValues.isSignificantDelay ? 'Lançamento com atraso significativo' : 'Lançamento postergado'}
               </div>
               <div>
-                {isSignificantDelay 
+                {calculatedValues.isSignificantDelay 
                   ? 'Esta compra será lançada com mais de 1 mês de diferença da data de compra.'
                   : 'Esta compra será lançada em um mês diferente da data de compra devido ao período de fechamento do cartão.'
                 }
@@ -250,6 +272,6 @@ const FaturaPreview: React.FC<FaturaPreviewProps> = ({
     </div>
     </TooltipProvider>
   );
-};
+});
 
 export default FaturaPreview;

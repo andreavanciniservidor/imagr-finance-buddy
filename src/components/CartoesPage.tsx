@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
 import { Plus, Edit, Trash2, CreditCard, AlertTriangle } from 'lucide-react';
 import PeriodoInfo from './PeriodoInfo';
 import { CartaoExtended } from '../types/cartao';
+import { FaturaCalculator } from '@/lib/faturaCalculator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +38,8 @@ const CartoesPage = () => {
     cor: '#3B82F6'
   });
 
-  const cores = [
+  // Memoize color options to avoid recreation on each render
+  const cores = useMemo(() => [
     { nome: 'Azul', valor: '#3B82F6' },
     { nome: 'Verde', valor: '#10B981' },
     { nome: 'Vermelho', valor: '#EF4444' },
@@ -46,7 +48,7 @@ const CartoesPage = () => {
     { nome: 'Laranja', valor: '#F59E0B' },
     { nome: 'Cinza', valor: '#6B7280' },
     { nome: 'Indigo', valor: '#6366F1' }
-  ];
+  ], []);
 
   useEffect(() => {
     if (user) {
@@ -54,12 +56,13 @@ const CartoesPage = () => {
     }
   }, [user]);
 
-  const fetchCartoes = async () => {
+  // Optimized database query with specific field selection for better performance
+  const fetchCartoes = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('cartoes')
-        .select('*')
+        .select('id, nome, cor, dia_fechamento, dia_vencimento, melhor_dia_compra, created_at, updated_at, user_id')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
@@ -75,7 +78,7 @@ const CartoesPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, toast]);
 
   // Check if changes are significant (closing day change for existing card)
   const checkSignificantChanges = (newData: any, originalCartao: CartaoExtended | null) => {
@@ -118,10 +121,13 @@ const CartoesPage = () => {
     await submitCartao(cartaoData);
   };
 
-  const submitCartao = async (cartaoData: any) => {
+  const submitCartao = useCallback(async (cartaoData: any) => {
     setSubmitting(true);
     try {
       if (editingCartao) {
+        // Clear cache for the card being updated to ensure fresh calculations
+        FaturaCalculator.clearCacheForCard(editingCartao.id);
+        
         // Atualizar cartão existente
         const { error } = await supabase
           .from('cartoes')
@@ -168,7 +174,7 @@ const CartoesPage = () => {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [editingCartao, toast, fetchCartoes]);
 
   const handleEdit = (cartao: CartaoExtended) => {
     setEditingCartao(cartao);
@@ -183,10 +189,13 @@ const CartoesPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (cartaoId: string) => {
+  const handleDelete = useCallback(async (cartaoId: string) => {
     if (!confirm('Tem certeza que deseja excluir este cartão?')) return;
 
     try {
+      // Clear cache for the card being deleted
+      FaturaCalculator.clearCacheForCard(cartaoId);
+      
       const { error } = await supabase
         .from('cartoes')
         .delete()
@@ -207,7 +216,7 @@ const CartoesPage = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [toast, fetchCartoes]);
 
   const validateForm = () => {
     const errors: {[key: string]: string} = {};

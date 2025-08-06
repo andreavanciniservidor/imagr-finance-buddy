@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Calendar, Clock, CreditCard, Info, AlertTriangle } from 'lucide-react';
 import { CartaoExtended } from '../types/cartao';
 import { FaturaCalculator } from '../lib/faturaCalculator';
@@ -11,22 +11,24 @@ interface PeriodoInfoProps {
   className?: string;
 }
 
-const PeriodoInfo: React.FC<PeriodoInfoProps> = ({ 
+const PeriodoInfo: React.FC<PeriodoInfoProps> = React.memo(({ 
   cartao, 
   showDetails = true, 
   className = '' 
 }) => {
-  const calculation = FaturaCalculator.getComprehensiveCalculation(cartao);
+  // Memoize expensive calculation to avoid recalculation on each render
+  const calculation = useMemo(() => {
+    return FaturaCalculator.getComprehensiveCalculation(cartao);
+  }, [cartao.id, cartao.dia_fechamento, cartao.dia_vencimento, cartao.melhor_dia_compra]);
+  
   const { periodoAtual, proximoFechamento, proximoVencimento, diasParaFechamento } = calculation;
 
-  // Determine urgency level for closing
-  const getClosingUrgency = () => {
+  // Memoize urgency calculation to avoid recalculation
+  const urgency = useMemo(() => {
     if (diasParaFechamento === 0) return 'urgent';
     if (diasParaFechamento <= 3) return 'warning';
     return 'normal';
-  };
-
-  const urgency = getClosingUrgency();
+  }, [diasParaFechamento]);
 
   return (
     <TooltipProvider>
@@ -158,6 +160,6 @@ const PeriodoInfo: React.FC<PeriodoInfoProps> = ({
     </div>
     </TooltipProvider>
   );
-};
+});
 
 export default PeriodoInfo;

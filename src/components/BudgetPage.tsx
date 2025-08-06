@@ -578,183 +578,134 @@ const BudgetPage = () => {
         </Dialog>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Orçamentos Ativos</h2>
+      {/* Lista de Orçamentos em Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {budgets.length > 0 ? (
+          budgets.map((budget) => {
+            const progress = getBudgetProgress(budget);
+            const cardColor = progress.isOverBudget 
+              ? '#EF4444' 
+              : progress.isNearLimit 
+                ? '#F59E0B' 
+                : '#10B981';
 
-        <div className="space-y-6">
-          {budgets.length > 0 ? (
-            budgets.map((budget) => (
-              <div key={budget.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">{budget.name}</h3>
-                    <div className="flex flex-col sm:hidden">
-                      <p className="text-xl font-bold text-gray-900">
-                        R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-sm text-gray-500 capitalize">{budget.period}</p>
-                    </div>
+            return (
+              <div
+                key={budget.id}
+                className="rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow text-white"
+                style={{ backgroundColor: cardColor }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    {progress.isOverBudget ? (
+                      <AlertTriangle size={20} className="text-white" />
+                    ) : progress.isNearLimit ? (
+                      <Bell size={20} className="text-white" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-white bg-opacity-30 flex items-center justify-center">
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between sm:justify-end space-x-4">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-lg font-bold text-gray-900">
-                        R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-sm text-gray-500 capitalize">{budget.period}</p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(budget)}
-                        className="p-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEdit(budget)}
+                      className="p-2 text-white hover:text-white hover:bg-white hover:bg-opacity-20 rounded-md transition-colors"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button className="p-2 text-white hover:text-white hover:bg-white hover:bg-opacity-20 rounded-md transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja excluir o orçamento "{budget.name}"? Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(budget.id)}
+                            className="bg-red-600 hover:bg-red-700"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir o orçamento "{budget.name}"? Esta ação não pode ser desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(budget.id)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
 
-                {(() => {
-                  const progress = getBudgetProgress(budget);
-                  return (
-                    <>
-                      <div className="mb-4">
-                        <div className="flex justify-between text-sm text-gray-600 mb-2">
-                          <span>Categoria: {budget.categories?.name || 'N/A'}</span>
-                          <span>
-                            R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / 
-                            R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        
-                        <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
-                          <div 
-                            className={`h-3 rounded-full transition-all duration-300 ${
-                              progress.isOverBudget 
-                                ? 'bg-red-500' 
-                                : progress.isNearLimit 
-                                  ? 'bg-yellow-500' 
-                                  : 'bg-green-500'
-                            }`}
-                            style={{ width: `${Math.min(progress.percentage, 100)}%` }}
-                          />
-                        </div>
-                        
-                        <div className="flex justify-between items-center text-xs text-gray-500">
-                          <span>{progress.percentage.toFixed(1)}% usado</span>
-                          <span>Alerta: {budget.alert_threshold}%</span>
-                        </div>
-                      </div>
+                <h3 className="text-lg font-semibold text-white mb-4">{budget.name}</h3>
+                
+                {/* Informações do orçamento */}
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm text-white text-opacity-90">
+                    <span>Categoria:</span>
+                    <span className="font-medium">{budget.categories?.name || 'N/A'}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm text-white text-opacity-90">
+                    <span>Período:</span>
+                    <span className="font-medium capitalize">{budget.period}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm text-white text-opacity-90">
+                    <span>Orçamento:</span>
+                    <span className="font-medium">
+                      R$ {Number(budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
 
-                      {/* Status e Alertas */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          {progress.isOverBudget ? (
-                            <>
-                              <AlertTriangle className="w-4 h-4 text-red-500" />
-                              <span className="text-sm font-medium text-red-600">
-                                Orçamento excedido
-                              </span>
-                            </>
-                          ) : progress.isNearLimit ? (
-                            <>
-                              <Bell className="w-4 h-4 text-yellow-500" />
-                              <span className="text-sm font-medium text-yellow-600">
-                                Próximo do limite
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-sm font-medium text-green-600">
-                              Dentro do orçamento
-                            </span>
-                          )}
-                        </div>
-                        
-                        {progress.isNearLimit && (
-                          <div className="flex items-center space-x-1 text-xs text-gray-500">
-                            <Bell className="w-3 h-3" />
-                            <span>Alerta ativo</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Alerta de Limite */}
-                      {progress.isNearLimit && !progress.isOverBudget && (
-                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <div className="flex items-start space-x-2">
-                            <Bell className="w-4 h-4 text-yellow-600 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium text-yellow-800">
-                                Notificação de Limite
-                              </p>
-                              <p className="text-xs text-yellow-700 mt-1">
-                                Você atingiu {progress.percentage.toFixed(1)}% do seu orçamento. 
-                                Restam R$ {(budget.amount - progress.spent).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
-                                para este período.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Alerta de Orçamento Excedido */}
-                      {progress.isOverBudget && (
-                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                          <div className="flex items-start space-x-2">
-                            <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium text-red-800">
-                                Orçamento Excedido
-                              </p>
-                              <p className="text-xs text-red-700 mt-1">
-                                Você excedeu seu orçamento em R$ {(progress.spent - budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. 
-                                Considere revisar seus gastos nesta categoria.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
+                {/* Barra de progresso */}
+                <div className="mt-4 pt-4 border-t border-white border-opacity-20">
+                  <div className="flex justify-between text-sm text-white text-opacity-90 mb-2">
+                    <span>Gasto:</span>
+                    <span className="font-medium">
+                      R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  
+                  <div className="w-full bg-white bg-opacity-30 rounded-full h-2 mb-2">
+                    <div 
+                      className="h-2 rounded-full bg-white transition-all duration-300"
+                      style={{ width: `${Math.min(progress.percentage, 100)}%` }}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-xs text-white text-opacity-75">
+                    <span>{progress.percentage.toFixed(1)}% usado</span>
+                    <span>
+                      {progress.isOverBudget 
+                        ? 'Excedido' 
+                        : progress.isNearLimit 
+                          ? 'Próximo do limite' 
+                          : 'Dentro do orçamento'
+                      }
+                    </span>
+                  </div>
+                </div>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>Nenhum orçamento criado ainda</p>
-              <p className="text-sm mt-2">Clique em "Criar Novo Orçamento" para começar</p>
+            );
+          })
+        ) : (
+          <div className="col-span-full text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+              <Bell size={24} className="text-gray-400" />
             </div>
-          )}
-        </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum orçamento criado</h3>
+            <p className="text-gray-600 mb-4">Comece criando seu primeiro orçamento para controlar seus gastos</p>
+            <Button onClick={() => setIsModalOpen(true)} className="px-4 py-2">
+              Criar Primeiro Orçamento
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

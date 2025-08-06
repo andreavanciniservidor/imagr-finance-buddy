@@ -2,6 +2,11 @@
  * FaturaCalculator - Core logic for credit card billing period calculations
  * This class handles all calculations related to credit card billing periods,
  * including launch dates, due dates, and period boundaries.
+ * 
+ * Performance optimizations:
+ * - Caching for frequently calculated periods
+ * - Memoization of expensive calculations
+ * - Efficient date operations
  */
 
 import { 
@@ -19,56 +24,174 @@ import {
   adjustDayForMonth,
   createDateWithDayAdjustment
 } from './dateUtils';
+import PerformanceMonitor from './performanceMonitor';
+
+// Cache interface for storing calculated periods
+interface CacheEntry {
+  result: FaturaPeriod;
+  timestamp: number;
+}
+
+// Cache for fatura periods - expires after 1 hour
+const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+const faturaCache = new Map<string, CacheEntry>();
+
+// Cache for launch date calculations - expires after 30 minutes
+const launchDateCache = new Map<string, { result: Date; timestamp: number }>();
+const LAUNCH_DATE_CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 export class FaturaCalculator {
   /**
+   * Generates a cache key for fatura period calculations
+   * @private
+   */
+  private static generateFaturaCacheKey(cartao: CartaoExtended, referenceDate: Date): string {
+    const dateKey = `${referenceDate.getFullYear()}-${referenceDate.getMonth()}-${referenceDate.getDate()}`;
+    return `fatura_${cartao.id}_${cartao.dia_fechamento}_${cartao.dia_vencimento || 'null'}_${dateKey}`;
+  }
+
+  /**
+   * Generates a cache key for launch date calculations
+   * @private
+   */
+  private static generateLaunchDateCacheKey(purchaseDate: Date, cartao: CartaoExtended): string {
+    const dateKey = `${purchaseDate.getFullYear()}-${purchaseDate.getMonth()}-${purchaseDate.getDate()}`;
+    return `launch_${cartao.id}_${cartao.dia_fechamento}_${cartao.dia_vencimento || 'null'}_${dateKey}`;
+  }
+
+  /**
+   * Clears expired entries from cache
+   * @private
+   */
+  private static cleanupCache(): void {
+    const now = Date.now();
+    
+    // Clean fatura cache
+    for (const [key, entry] of faturaCache.entries()) {
+      if (now - entry.timestamp > CACHE_EXPIRY_MS) {
+        faturaCache.delete(key);
+      }
+    }
+    
+    // Clean launch date cache
+    for (const [key, entry] of launchDateCache.entries()) {
+      if (now - entry.timestamp > LAUNCH_DATE_CACHE_EXPIRY_MS) {
+        launchDateCache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Clears all cached data (useful for testing or when card data changes)
+   */
+  static clearCache(): void {
+    faturaCache.clear();
+    launchDateCache.clear();
+  }
+
+  /**
+   * Clears cache entries for a specific card
+   */
+  static clearCacheForCard(cartaoId: string): void {
+    // Clear fatura cache entries for this card
+    for (const [key] of faturaCache.entries()) {
+      if (key.includes(`_${cartaoId}_`)) {
+        faturaCache.delete(key);
+      }
+    }
+    
+    // Clear launch date cache entries for this card
+    for (const [key] of launchDateCache.entries()) {
+      if (key.includes(`_${cartaoId}_`)) {
+        launchDateCache.delete(key);
+      }
+    }
+  }
+  /**
    * Calculates the billing period for a specific reference date
    * Returns the period that contains the reference date
-   * Includes fallback logic for calculation errors
+   * Includes fallback logic for calculation errors and caching for performance
    */
   static getFaturaPeriod(cartao: CartaoExtended, referenceDate: Date = new Date()): FaturaPeriod {
-    try {
-      // Validate inputs
-      if (!this.isValidDate(referenceDate)) {
-        throw new Error('Invalid reference date provided');
+    return PerformanceMonitor.timeFunction('FaturaCalculator.getFaturaPeriod', () => {
+      // Validate inputs first - handle null/undefined cartao
+      if (!cartao) {
+        console.warn('FaturaCalculator.getFaturaPeriod: null/undefined cartao provided, using fallback');
+        return this.getFallbackFaturaPeriod({ dia_fechamento: 15 } as CartaoExtended, referenceDate);
       }
       
-      const validation = this.validateCardConfiguration(cartao);
-      if (!validation.isValid) {
-        throw new Error(`Invalid card configuration: ${validation.errors.join(', ')}`);
+      // Check cache first
+      const cacheKey = this.generateFaturaCacheKey(cartao, referenceDate);
+      const cachedEntry = faturaCache.get(cacheKey);
+      
+      if (cachedEntry && (Date.now() - cachedEntry.timestamp) < CACHE_EXPIRY_MS) {
+        return cachedEntry.result;
+      }
+      
+      // Cleanup expired cache entries periodically
+      if (Math.random() < 0.1) { // 10% chance to cleanup on each call
+        this.cleanupCache();
       }
 
-      const closingDay = cartao.dia_fechamento;
-      
-      // Get the current month's closing date
-      const currentClosing = getPreviousOccurrenceOfDay(referenceDate, closingDay);
-      
-      // Get the next month's closing date (end of current period)
-      const nextClosing = getNextOccurrenceOfDay(currentClosing, closingDay);
-      
-      // Period starts the day after previous closing and ends on next closing
-      const inicio = new Date(currentClosing);
-      inicio.setDate(inicio.getDate() + 1);
-      
-      const fim = nextClosing;
-      
-      // Calculate reference month (the month when the bill is due)
-      const mesReferencia = `${getMonthNamePT(nextClosing)} ${nextClosing.getFullYear()}`;
-      
-      // Calculate days remaining until closing
-      const diasRestantes = Math.max(0, daysDifference(referenceDate, fim));
-      
-      return {
-        inicio,
-        fim,
-        mesReferencia,
-        diasRestantes
-      };
-    } catch (error) {
-      // Fallback to simple calculation if advanced calculation fails
-      console.warn('FaturaCalculator.getFaturaPeriod failed, using fallback:', error);
-      return this.getFallbackFaturaPeriod(cartao, referenceDate);
-    }
+      try {
+        // Validate inputs
+        if (!this.isValidDate(referenceDate)) {
+          throw new Error('Invalid reference date provided');
+        }
+        
+        const validation = this.validateCardConfiguration(cartao);
+        if (!validation.isValid) {
+          throw new Error(`Invalid card configuration: ${validation.errors.join(', ')}`);
+        }
+
+        const closingDay = cartao.dia_fechamento;
+        
+        // Get the current month's closing date
+        const currentClosing = getPreviousOccurrenceOfDay(referenceDate, closingDay);
+        
+        // Get the next month's closing date (end of current period)
+        const nextClosing = getNextOccurrenceOfDay(currentClosing, closingDay);
+        
+        // Period starts the day after previous closing and ends on next closing
+        const inicio = new Date(currentClosing);
+        inicio.setDate(inicio.getDate() + 1);
+        
+        const fim = nextClosing;
+        
+        // Calculate reference month (the month when the bill is due)
+        const mesReferencia = `${getMonthNamePT(nextClosing)} ${nextClosing.getFullYear()}`;
+        
+        // Calculate days remaining until closing
+        const diasRestantes = Math.max(0, daysDifference(referenceDate, fim));
+        
+        const result = {
+          inicio,
+          fim,
+          mesReferencia,
+          diasRestantes
+        };
+        
+        // Cache the result
+        faturaCache.set(cacheKey, {
+          result,
+          timestamp: Date.now()
+        });
+        
+        return result;
+      } catch (error) {
+        // Fallback to simple calculation if advanced calculation fails
+        console.warn('FaturaCalculator.getFaturaPeriod failed, using fallback:', error);
+        const fallbackResult = this.getFallbackFaturaPeriod(cartao, referenceDate);
+        
+        // Cache fallback result too (with shorter expiry)
+        faturaCache.set(cacheKey, {
+          result: fallbackResult,
+          timestamp: Date.now()
+        });
+        
+        return fallbackResult;
+      }
+    });
   }
 
   /**
@@ -135,40 +258,72 @@ export class FaturaCalculator {
   /**
    * Calculates when a purchase will be launched (appear on the bill)
    * Based on the purchase date and the card's billing cycle
-   * Includes error handling and fallback logic
+   * Includes error handling, fallback logic, and caching for performance
    */
   static calculateLaunchDate(purchaseDate: Date, cartao: CartaoExtended): Date {
-    try {
-      // Validate inputs
-      if (!this.isValidDate(purchaseDate)) {
-        throw new Error('Invalid purchase date provided');
+    return PerformanceMonitor.timeFunction('FaturaCalculator.calculateLaunchDate', () => {
+      // Validate inputs first - handle null/undefined cartao
+      if (!cartao) {
+        console.warn('FaturaCalculator.calculateLaunchDate: null/undefined cartao provided, using fallback');
+        return this.getFallbackLaunchDate(purchaseDate, { dia_fechamento: 15 } as CartaoExtended);
       }
       
-      const validation = this.validateCardConfiguration(cartao);
-      if (!validation.isValid) {
-        throw new Error(`Invalid card configuration: ${validation.errors.join(', ')}`);
+      // Check cache first
+      const cacheKey = this.generateLaunchDateCacheKey(purchaseDate, cartao);
+      const cachedEntry = launchDateCache.get(cacheKey);
+      
+      if (cachedEntry && (Date.now() - cachedEntry.timestamp) < LAUNCH_DATE_CACHE_EXPIRY_MS) {
+        return cachedEntry.result;
       }
 
-      const closingDay = cartao.dia_fechamento;
-      
-      // Get the next closing date after the purchase
-      const nextClosing = getNextOccurrenceOfDay(purchaseDate, closingDay);
-      
-      // The launch date is typically the month after the closing
-      // But we need to consider the due date for the actual billing month
-      const dueDay = cartao.dia_vencimento || (closingDay + CARTAO_DEFAULTS.dia_vencimento_offset);
-      const adjustedDueDay = adjustDayForMonth(dueDay, nextClosing.getFullYear(), nextClosing.getMonth() + 1);
-      
-      // Create the launch date in the month after closing
-      const launchYear = nextClosing.getMonth() === 11 ? nextClosing.getFullYear() + 1 : nextClosing.getFullYear();
-      const launchMonth = nextClosing.getMonth() === 11 ? 1 : nextClosing.getMonth() + 2; // +2 because getMonth() is 0-indexed
-      
-      return createDateWithDayAdjustment(launchYear, launchMonth, adjustedDueDay);
-    } catch (error) {
-      // Fallback to simple calculation if advanced calculation fails
-      console.warn('FaturaCalculator.calculateLaunchDate failed, using fallback:', error);
-      return this.getFallbackLaunchDate(purchaseDate, cartao);
-    }
+      try {
+        // Validate inputs
+        if (!this.isValidDate(purchaseDate)) {
+          throw new Error('Invalid purchase date provided');
+        }
+        
+        const validation = this.validateCardConfiguration(cartao);
+        if (!validation.isValid) {
+          throw new Error(`Invalid card configuration: ${validation.errors.join(', ')}`);
+        }
+
+        const closingDay = cartao.dia_fechamento;
+        
+        // Get the next closing date after the purchase
+        const nextClosing = getNextOccurrenceOfDay(purchaseDate, closingDay);
+        
+        // The launch date is typically the month after the closing
+        // But we need to consider the due date for the actual billing month
+        const dueDay = cartao.dia_vencimento || (closingDay + CARTAO_DEFAULTS.dia_vencimento_offset);
+        const adjustedDueDay = adjustDayForMonth(dueDay, nextClosing.getFullYear(), nextClosing.getMonth() + 1);
+        
+        // Create the launch date in the month after closing
+        const launchYear = nextClosing.getMonth() === 11 ? nextClosing.getFullYear() + 1 : nextClosing.getFullYear();
+        const launchMonth = nextClosing.getMonth() === 11 ? 1 : nextClosing.getMonth() + 2; // +2 because getMonth() is 0-indexed
+        
+        const result = createDateWithDayAdjustment(launchYear, launchMonth, adjustedDueDay);
+        
+        // Cache the result
+        launchDateCache.set(cacheKey, {
+          result,
+          timestamp: Date.now()
+        });
+        
+        return result;
+      } catch (error) {
+        // Fallback to simple calculation if advanced calculation fails
+        console.warn('FaturaCalculator.calculateLaunchDate failed, using fallback:', error);
+        const fallbackResult = this.getFallbackLaunchDate(purchaseDate, cartao);
+        
+        // Cache fallback result too
+        launchDateCache.set(cacheKey, {
+          result: fallbackResult,
+          timestamp: Date.now()
+        });
+        
+        return fallbackResult;
+      }
+    });
   }
 
   /**

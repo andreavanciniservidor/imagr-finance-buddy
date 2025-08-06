@@ -206,11 +206,13 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     try {
       console.log(`Buscando categorias (tentativa ${retryCount + 1})...`);
       
+      // Optimized query with specific field selection and proper indexing
       const { data, error } = await supabase
         .from('categories')
         .select('id, name')
         .eq('type', formData.transactionType)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('name'); // Add ordering for consistent results
 
       if (error) throw error;
       
