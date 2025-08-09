@@ -205,47 +205,39 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium text-green-600">Fin</span>
-              <span className="text-sm font-medium text-gray-600">Control</span>
-            </div>
-            <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-          </div>
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-8">
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => navigateMonth('prev')}
                 className="p-1 hover:bg-gray-100 rounded"
               >
-                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
               </button>
-              <span className="text-sm font-medium text-gray-700 min-w-[120px] text-center">
+              <span className="text-base font-medium text-gray-900 min-w-[140px] text-center">
                 {monthNames[currentDate.getMonth()]} de {currentDate.getFullYear()}
               </span>
               <button
                 onClick={() => navigateMonth('next')}
                 className="p-1 hover:bg-gray-100 rounded"
               >
-                <ChevronRight className="w-4 h-4 text-gray-600" />
+                <ChevronRight className="w-5 h-5 text-gray-600" />
               </button>
             </div>
             
             <div className="text-right">
-              <div className="text-xs text-gray-500 uppercase">Saldo do Mês</div>
-              <div className={`text-lg font-semibold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              <div className="text-xs text-gray-500 uppercase font-medium">Saldo do Mês</div>
+              <div className="text-xl font-bold text-red-600">
+                R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, signDisplay: 'always' })}
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="p-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
