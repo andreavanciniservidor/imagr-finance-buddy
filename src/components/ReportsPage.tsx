@@ -48,12 +48,24 @@ const ReportsPage = () => {
       case 'current_month':
         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
         break;
+      case 'next_month':
+        startDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+        break;
+      case 'last_year':
+        startDate = new Date(today.getFullYear() - 1, 0, 1);
+        endDate = new Date(today.getFullYear() - 1, 11, 31);
+        break;
       case 'last_month':
         startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         endDate = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
-      case 'current_year':
-        startDate = new Date(today.getFullYear(), 0, 1);
+      case 'last_quarter':
+        const currentQuarter = Math.floor(today.getMonth() / 3);
+        const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
+        const lastQuarterYear = currentQuarter === 0 ? today.getFullYear() - 1 : today.getFullYear();
+        startDate = new Date(lastQuarterYear, lastQuarter * 3, 1);
+        endDate = new Date(lastQuarterYear, (lastQuarter + 1) * 3, 0);
         break;
       default:
         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -195,8 +207,10 @@ const ReportsPage = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="current_month">Mês Atual</option>
-                <option value="last_month">Mês Anterior</option>
-                <option value="current_year">Ano Atual</option>
+                <option value="next_month">Próximo Mês</option>
+                <option value="last_year">Último Ano</option>
+                <option value="last_month">Último Mês</option>
+                <option value="last_quarter">Último Trimestre</option>
               </select>
             </div>
             <div>
