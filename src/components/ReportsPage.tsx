@@ -221,8 +221,8 @@ const ReportsPage = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="expenses_by_category">Despesas por Categoria</option>
-                <option value="income_by_category">Receitas por Categoria</option>
-                <option value="monthly_summary">Resumo Mensal</option>
+                <option value="payment_method">Método de Pagamento</option>
+                <option value="monthly_transactions">Transações do Mês</option>
               </select>
             </div>
           </div>
