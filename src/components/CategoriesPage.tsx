@@ -214,12 +214,12 @@ const CategoriesPage = () => {
 
       <div className="p-3 sm:p-6">
         {/* Tabs */}
-        <div className="flex space-x-1 mb-6">
+        <div className="flex space-x-1 mb-4 sm:mb-6 bg-gray-100 p-1 rounded-lg">
           <button
             onClick={() => setActiveTab('expense')}
-            className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex-1 px-3 sm:px-6 py-2 text-sm font-medium rounded-md transition-colors ${
               activeTab === 'expense'
-                ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -227,9 +227,9 @@ const CategoriesPage = () => {
           </button>
           <button
             onClick={() => setActiveTab('income')}
-            className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex-1 px-3 sm:px-6 py-2 text-sm font-medium rounded-md transition-colors ${
               activeTab === 'income'
-                ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >

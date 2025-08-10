@@ -473,57 +473,55 @@ const TransactionsPage = () => {
               </div>
 
               {/* Mobile Cards */}
-              <div className="md:hidden space-y-3 p-4">
+              <div className="md:hidden space-y-2 px-1">
                 {filteredTransactions.map((transaction) => (
-                  <div key={transaction.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          transaction.type === 'income' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {transaction.type === 'income' ? 'Receita' : 'Despesa'}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(transaction.date).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit'
-                          })}
-                        </span>
+                  <div key={transaction.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                            transaction.type === 'income' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {transaction.type === 'income' ? 'Receita' : 'Despesa'}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(transaction.date).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <h3 className="font-medium text-gray-900 text-sm truncate">{transaction.description}</h3>
+                        <p className="text-xs text-gray-500 truncate">
+                          {transaction.categories?.name || 'Sem categoria'} • {getPaymentMethodDisplay(transaction.payment_method)}
+                        </p>
                       </div>
-                      <button
-                        onClick={() => setShowActionMenu(showActionMenu === transaction.id ? null : transaction.id)}
-                        className="text-gray-400 hover:text-gray-600 p-1"
-                      >
-                        ⋯
-                      </button>
-                    </div>
-                    
-                    <div className="mb-2">
-                      <h3 className="font-medium text-gray-900 text-sm">{transaction.description}</h3>
-                      <p className="text-xs text-gray-500">
-                        {transaction.categories?.name || 'Sem categoria'} • {getPaymentMethodDisplay(transaction.payment_method)}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                        {transaction.type === 'income' ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
+                      <div className="flex items-center space-x-2 ml-2">
+                        <span className={`text-base font-semibold whitespace-nowrap ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                          {transaction.type === 'income' ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <button
+                          onClick={() => setShowActionMenu(showActionMenu === transaction.id ? null : transaction.id)}
+                          className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                        >
+                          ⋯
+                        </button>
+                      </div>
                     </div>
 
                     {showActionMenu === transaction.id && (
-                      <div className="mt-3 pt-3 border-t border-gray-200 flex space-x-2">
+                      <div className="mt-2 pt-2 border-t border-gray-200 flex space-x-2">
                         <button
                           onClick={() => {
                             setSelectedTransaction(transaction);
                             setShowEditModal(true);
                             setShowActionMenu(null);
                           }}
-                          className="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-100 flex items-center justify-center gap-2"
+                          className="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded-md text-xs font-medium hover:bg-blue-100 flex items-center justify-center gap-1"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3 h-3" />
                           Editar
                         </button>
                         <button
@@ -531,9 +529,9 @@ const TransactionsPage = () => {
                             handleDelete(transaction.id);
                             setShowActionMenu(null);
                           }}
-                          className="flex-1 bg-red-50 text-red-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-red-100 flex items-center justify-center gap-2"
+                          className="flex-1 bg-red-50 text-red-600 px-3 py-2 rounded-md text-xs font-medium hover:bg-red-100 flex items-center justify-center gap-1"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3 h-3" />
                           Excluir
                         </button>
                       </div>
