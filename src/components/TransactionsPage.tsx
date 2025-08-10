@@ -541,9 +541,6 @@ const TransactionsPage = () => {
                   </div>
                 ))}
               </div>
-            </>
-          )}
-
               {filteredTransactions.length === 0 && !loading && (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
@@ -569,7 +566,7 @@ const TransactionsPage = () => {
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
