@@ -4,6 +4,8 @@ import { Download, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface Transaction {
   id: string;
@@ -173,10 +175,91 @@ const ReportsPage = () => {
   };
 
   const exportToPDF = () => {
-    toast({
-      title: "Em desenvolvimento",
-      description: "Funcionalidade de exportação PDF será implementada em breve",
-    });
+    try {
+      const doc = new jsPDF();
+      const categoryExpenses = getCategoryExpenses();
+      
+      // Configurar fonte para suportar caracteres especiais
+      doc.setFont('helvetica');
+      
+      // Título do relatório
+      doc.setFontSize(20);
+      doc.text('Relatório Financeiro', 20, 20);
+      
+      // Informações do período
+      const periodText = selectedPeriod === 'current_month' ? 'Mês Atual' : 
+                        selectedPeriod === 'last_month' ? 'Último Mês' :
+                        selectedPeriod === 'next_month' ? 'Próximo Mês' :
+                        selectedPeriod === 'last_year' ? 'Último Ano' :
+                        selectedPeriod === 'last_quarter' ? 'Último Trimestre' : 'Período Selecionado';
+      
+      doc.setFontSize(12);
+      doc.text(`Período: ${periodText}`, 20, 35);
+      doc.text(`Tipo: Despesas por Categoria`, 20, 45);
+      doc.text(`Data de geração: ${new Date().toLocaleDateString('pt-BR')}`, 20, 55);
+      
+      // Resumo financeiro
+      doc.setFontSize(16);
+      doc.text('Resumo do Período', 20, 75);
+      
+      doc.setFontSize(12);
+      doc.text(`Receitas: R$ ${incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 90);
+      doc.text(`Despesas: R$ ${expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 100);
+      doc.text(`Saldo: R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, signDisplay: 'always' })}`, 20, 110);
+      
+      // Tabela de despesas por categoria
+      if (categoryExpenses.length > 0) {
+        doc.setFontSize(16);
+        doc.text('Despesas por Categoria', 20, 130);
+        
+        // Preparar dados da tabela
+        const tableData = categoryExpenses.map(category => [
+          category.name,
+          `R$ ${category.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          `${category.percentage.toFixed(1)}%`
+        ]);
+        
+        // Adicionar tabela usando autoTable
+        (doc as any).autoTable({
+          head: [['Categoria', 'Valor', 'Percentual']],
+          body: tableData,
+          startY: 140,
+          styles: {
+            fontSize: 10,
+            cellPadding: 5,
+          },
+          headStyles: {
+            fillColor: [66, 139, 202],
+            textColor: 255,
+            fontStyle: 'bold'
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245]
+          },
+          columnStyles: {
+            1: { halign: 'right' },
+            2: { halign: 'right' }
+          }
+        });
+      }
+      
+      // Salvar o PDF
+      const fileName = `relatorio-despesas-categoria-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      
+      toast({
+        title: "Sucesso",
+        description: "Relatório PDF gerado com sucesso!",
+      });
+      
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar relatório PDF",
+        variant: "destructive"
+      });
+    }
   };
 
   const categoryExpenses = getCategoryExpenses();
