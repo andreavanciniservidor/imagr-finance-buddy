@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -278,7 +277,7 @@ const TransactionsPage = () => {
       <AddTransactionModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onTransactionAdded={fetchTransactions}
+        onSuccess={fetchTransactions}
       />
 
       {editingTransaction && (
@@ -289,7 +288,7 @@ const TransactionsPage = () => {
             setEditingTransaction(null);
           }}
           transaction={editingTransaction}
-          onTransactionUpdated={fetchTransactions}
+          onSuccess={fetchTransactions}
         />
       )}
     </div>
