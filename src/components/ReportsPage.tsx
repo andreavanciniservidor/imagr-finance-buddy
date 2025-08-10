@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from './ui/use-toast';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 interface Transaction {
   id: string;
@@ -220,7 +220,7 @@ const ReportsPage = () => {
         ]);
         
         // Adicionar tabela usando autoTable
-        (doc as any).autoTable({
+        autoTable(doc, {
           head: [['Categoria', 'Valor', 'Percentual']],
           body: tableData,
           startY: 140,
