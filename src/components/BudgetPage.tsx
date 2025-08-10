@@ -80,7 +80,7 @@ const BudgetPage = () => {
       if (error) throw error;
       setBudgets(data || []);
     } catch (error) {
-      console.error('Error fetching budgets:', error);
+      console.error('Erro ao buscar orçamentos:', error);
       toast({
         title: "Erro",
         description: "Erro ao carregar orçamentos",
@@ -104,7 +104,7 @@ const BudgetPage = () => {
       if (error) throw error;
       setCategories(data || []);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Erro ao buscar categorias:', error);
     }
   };
 
@@ -126,7 +126,7 @@ const BudgetPage = () => {
       if (error) throw error;
       setTransactions(data || []);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error('Erro ao buscar transações:', error);
     }
   };
 
@@ -155,7 +155,7 @@ const BudgetPage = () => {
     setLoading(true);
     try {
       if (editingBudget) {
-        // Update existing budget
+        // Atualizar orçamento existente
         const { error } = await supabase
           .from('budgets')
           .update({
@@ -175,7 +175,7 @@ const BudgetPage = () => {
           description: "Orçamento atualizado com sucesso!",
         });
       } else {
-        // Create new budget
+        // Criar novo orçamento
         const { error } = await supabase
           .from('budgets')
           .insert({
@@ -198,7 +198,7 @@ const BudgetPage = () => {
       fetchBudgets();
       closeModal();
     } catch (error) {
-      console.error('Error saving budget:', error);
+      console.error('Erro ao salvar orçamento:', error);
       toast({
         title: "Erro",
         description: "Erro ao salvar orçamento",
@@ -242,7 +242,7 @@ const BudgetPage = () => {
 
         fetchBudgets();
       } catch (error) {
-        console.error('Error deleting budget:', error);
+        console.error('Erro ao excluir orçamento:', error);
         toast({
           title: "Erro",
           description: "Erro ao excluir orçamento",
@@ -328,7 +328,7 @@ const BudgetPage = () => {
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
             >
               <Plus className="w-4 h-4" />
-              Create New Orçamento
+              Novo Orçamento
             </button>
           </div>
         </div>
@@ -392,7 +392,9 @@ const BudgetPage = () => {
                     <div className="text-lg font-semibold text-gray-900">
                       R$ {budget.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
-                    <div className="text-xs text-gray-500 capitalize">{budget.period}</div>
+                    <div className="text-xs text-gray-500">
+                      {budget.period === 'monthly' ? 'Mensal' : budget.period === 'yearly' ? 'Anual' : budget.period}
+                    </div>
                   </div>
 
                   {/* Progress Bar */}
