@@ -207,31 +207,31 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
           
-          <div className="flex items-center space-x-8">
-            <div className="flex items-center space-x-2">
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+            <div className="flex items-center justify-center space-x-2">
               <button
                 onClick={() => navigateMonth('prev')}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-2 hover:bg-gray-100 rounded"
               >
                 <ChevronLeft className="w-5 h-5 text-gray-600" />
               </button>
-              <span className="text-base font-medium text-gray-900 min-w-[140px] text-center">
+              <span className="text-sm sm:text-base font-medium text-gray-900 min-w-[120px] sm:min-w-[140px] text-center">
                 {monthNames[currentDate.getMonth()]} de {currentDate.getFullYear()}
               </span>
               <button
                 onClick={() => navigateMonth('next')}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-2 hover:bg-gray-100 rounded"
               >
                 <ChevronRight className="w-5 h-5 text-gray-600" />
               </button>
             </div>
             
-            <div className="text-right">
+            <div className="text-center sm:text-right">
               <div className="text-xs text-gray-500 uppercase font-medium">Saldo do Mês</div>
-              <div className="text-xl font-bold text-red-600">
+              <div className="text-lg sm:text-xl font-bold text-red-600">
                 R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, signDisplay: 'always' })}
               </div>
             </div>
@@ -239,55 +239,55 @@ const Dashboard = () => {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200">
             <div className="flex items-center space-x-2 mb-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-xs text-gray-600 uppercase">Receita</span>
             </div>
-            <div className="text-xl font-semibold text-gray-900">
+            <div className="text-lg sm:text-xl font-semibold text-gray-900">
               R$ {income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200">
             <div className="flex items-center space-x-2 mb-2">
               <div className="w-2 h-2 bg-red-500 rounded-full"></div>
               <span className="text-xs text-gray-600 uppercase">Despesas</span>
             </div>
-            <div className="text-xl font-semibold text-gray-900">
+            <div className="text-lg sm:text-xl font-semibold text-gray-900">
               R$ {expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200">
             <div className="flex items-center space-x-2 mb-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
               <span className="text-xs text-gray-600 uppercase">Total Parcelado</span>
             </div>
-            <div className="text-xl font-semibold text-gray-900">
+            <div className="text-lg sm:text-xl font-semibold text-gray-900">
               R$ {totalInstallments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200">
             <div className="flex items-center space-x-2 mb-2">
               <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
               <span className="text-xs text-gray-600 uppercase">Orçamentos</span>
             </div>
-            <div className="text-xl font-semibold text-gray-900">{budgetCount}</div>
+            <div className="text-lg sm:text-xl font-semibold text-gray-900">{budgetCount}</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           {/* Gastos por Categoria */}
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Gastos por Categoria</h2>
+          <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-gray-200">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Gastos por Categoria</h2>
             <div className="space-y-3">
               {categoryExpenses.map((category, index) => (
                 <div key={index} className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-700">{category.name}</span>
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm text-gray-700 truncate mr-2">{category.name}</span>
+                  <span className="text-sm font-medium text-gray-900 whitespace-nowrap">
                     R$ {category.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -301,8 +301,8 @@ const Dashboard = () => {
           </div>
 
           {/* Orçamentos */}
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Orçamentos</h2>
+          <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-gray-200">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Orçamentos</h2>
             <div className="space-y-4">
               {budgets.map((budget) => {
                 const progress = getBudgetProgress(budget);
@@ -315,8 +315,8 @@ const Dashboard = () => {
                 return (
                   <div key={budget.id} className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">{budget.name}</span>
-                      <div className="text-right">
+                      <span className="text-sm font-medium text-gray-700 truncate mr-2">{budget.name}</span>
+                      <div className="text-right flex-shrink-0">
                         <div className="text-xs text-gray-500">
                           R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / 
                           R$ {budget.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

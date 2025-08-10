@@ -294,17 +294,17 @@ const BudgetPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-4">
+        <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center">
-            <h1 className="text-xl font-semibold text-gray-900">Orçamentos</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Orçamentos</h1>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+          <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
+            <div className="flex items-center justify-center space-x-2">
               <button
                 onClick={() => navigateMonth('prev')}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-2 hover:bg-gray-100 rounded"
               >
                 <ChevronLeft className="w-4 h-4 text-gray-600" />
               </button>
@@ -313,7 +313,7 @@ const BudgetPage = () => {
               </span>
               <button
                 onClick={() => navigateMonth('next')}
-                className="p-1 hover:bg-gray-100 rounded"
+                className="p-2 hover:bg-gray-100 rounded"
               >
                 <ChevronRight className="w-4 h-4 text-gray-600" />
               </button>
@@ -321,7 +321,7 @@ const BudgetPage = () => {
             
             <button
               onClick={() => setShowModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
+              className="bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm"
             >
               <Plus className="w-4 h-4" />
               Novo Orçamento
@@ -330,7 +330,7 @@ const BudgetPage = () => {
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-3 sm:p-6">
         {/* Orçamentos Ativos Section */}
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Orçamentos Ativos</h2>

@@ -216,26 +216,26 @@ const TransactionsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="p-6">
+      <div className="p-3 sm:p-6">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Transações</h1>
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Transações</h1>
           
           {/* Month Navigation */}
-          <div className="flex items-center justify-center mb-6">
+          <div className="flex items-center justify-center mb-4 sm:mb-6">
             <button
               onClick={() => navigateMonth('prev')}
               className="p-2 hover:bg-gray-100 rounded"
             >
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <div className="flex items-center space-x-2 mx-8">
-              <span className="text-base font-medium text-gray-900">
+            <div className="flex items-center space-x-2 mx-4 sm:mx-8">
+              <span className="text-sm sm:text-base font-medium text-gray-900">
                 {monthNames[currentDate.getMonth()]} de {currentDate.getFullYear()}
               </span>
               <button
                 onClick={goToToday}
-                className="text-sm bg-blue-100 text-blue-600 px-3 py-1 rounded hover:bg-blue-200 font-medium"
+                className="text-xs sm:text-sm bg-blue-100 text-blue-600 px-2 sm:px-3 py-1 rounded hover:bg-blue-200 font-medium"
               >
                 Hoje
               </button>
@@ -249,18 +249,18 @@ const TransactionsPage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center gap-2 text-sm font-medium"
+                className="bg-blue-500 text-white px-3 sm:px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 text-sm font-medium"
               >
                 <Plus className="w-4 h-4" />
                 AdicionarReceita
               </button>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 flex items-center gap-2 text-sm font-medium"
+                className="bg-red-500 text-white px-3 sm:px-4 py-2 rounded-md hover:bg-red-600 flex items-center justify-center gap-2 text-sm font-medium"
               >
                 <Plus className="w-4 h-4" />
                 AdicionarDespesa
@@ -269,7 +269,7 @@ const TransactionsPage = () => {
             
             <button 
               onClick={() => setShowFilters(!showFilters)}
-              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center gap-2 text-sm font-medium"
+              className="bg-blue-500 text-white px-3 sm:px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 text-sm font-medium"
             >
               <Filter className="w-4 h-4" />
               Filtros
@@ -369,55 +369,115 @@ const TransactionsPage = () => {
           {loading ? (
             <div className="text-center py-8 text-gray-500">Carregando transações...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      DATA
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      DESCRIÇÃO
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      CATEGORIA
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      MÉTODO DE PAGAMENTO
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      TIPO
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      VALOR
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      AÇÕES
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredTransactions.map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric'
-                        })}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        <div className="max-w-xs">
-                          {transaction.description}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {transaction.categories?.name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {getPaymentMethodDisplay(transaction.payment_method)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        DATA
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        DESCRIÇÃO
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        CATEGORIA
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        MÉTODO
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        TIPO
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        VALOR
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        AÇÕES
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredTransactions.map((transaction) => (
+                      <tr key={transaction.id} className="hover:bg-gray-50">
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(transaction.date).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 text-sm text-gray-900">
+                          <div className="max-w-xs truncate">
+                            {transaction.description}
+                          </div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {transaction.categories?.name || '-'}
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {getPaymentMethodDisplay(transaction.payment_method)}
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            transaction.type === 'income' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {transaction.type === 'income' ? 'Receita' : 'Despesa'}
+                          </span>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                          <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                            {transaction.type === 'income' ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-center relative">
+                          <button
+                            onClick={() => setShowActionMenu(showActionMenu === transaction.id ? null : transaction.id)}
+                            className="text-gray-400 hover:text-gray-600 text-lg"
+                          >
+                            ⋯
+                          </button>
+                          {showActionMenu === transaction.id && (
+                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                              <button
+                                onClick={() => {
+                                  setSelectedTransaction(transaction);
+                                  setShowEditModal(true);
+                                  setShowActionMenu(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  handleDelete(transaction.id);
+                                  setShowActionMenu(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Excluir
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3 p-4">
+                {filteredTransactions.map((transaction) => (
+                  <div key={transaction.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
                         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                           transaction.type === 'income' 
                             ? 'bg-green-100 text-green-800' 
@@ -425,49 +485,64 @@ const TransactionsPage = () => {
                         }`}>
                           {transaction.type === 'income' ? 'Receita' : 'Despesa'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                        <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                          - R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <span className="text-xs text-gray-500">
+                          {new Date(transaction.date).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit'
+                          })}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center relative">
+                      </div>
+                      <button
+                        onClick={() => setShowActionMenu(showActionMenu === transaction.id ? null : transaction.id)}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        ⋯
+                      </button>
+                    </div>
+                    
+                    <div className="mb-2">
+                      <h3 className="font-medium text-gray-900 text-sm">{transaction.description}</h3>
+                      <p className="text-xs text-gray-500">
+                        {transaction.categories?.name || 'Sem categoria'} • {getPaymentMethodDisplay(transaction.payment_method)}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                        {transaction.type === 'income' ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {showActionMenu === transaction.id && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex space-x-2">
                         <button
-                          onClick={() => setShowActionMenu(showActionMenu === transaction.id ? null : transaction.id)}
-                          className="text-gray-400 hover:text-gray-600 text-lg"
+                          onClick={() => {
+                            setSelectedTransaction(transaction);
+                            setShowEditModal(true);
+                            setShowActionMenu(null);
+                          }}
+                          className="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-100 flex items-center justify-center gap-2"
                         >
-                          ⋯
+                          <Edit2 className="w-4 h-4" />
+                          Editar
                         </button>
-                        {showActionMenu === transaction.id && (
-                          <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                            <button
-                              onClick={() => {
-                                setSelectedTransaction(transaction);
-                                setShowEditModal(true);
-                                setShowActionMenu(null);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleDelete(transaction.id);
-                                setShowActionMenu(null);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Excluir
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <button
+                          onClick={() => {
+                            handleDelete(transaction.id);
+                            setShowActionMenu(null);
+                          }}
+                          className="flex-1 bg-red-50 text-red-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-red-100 flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
               {filteredTransactions.length === 0 && !loading && (
                 <div className="text-center py-12">

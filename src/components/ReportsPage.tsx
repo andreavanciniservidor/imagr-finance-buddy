@@ -267,17 +267,17 @@ const ReportsPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-4">
         <div className="flex items-center">
-          <h1 className="text-xl font-semibold text-gray-900">Relatórios</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Relatórios</h1>
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-3 sm:p-6">
         {/* Filtros de Relatório */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros de Relatório</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Filtros de Relatório</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">PERÍODO:</label>
               <select
@@ -308,15 +308,15 @@ const ReportsPage = () => {
         </div>
 
         {/* Resumo do Período */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Resumo do Período</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Resumo do Período</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="text-center">
               <div className="flex items-center justify-center mb-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
                 <span className="text-sm font-medium text-gray-700">Receitas</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-lg sm:text-2xl font-bold text-gray-900">
                 R$ {incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
@@ -325,7 +325,7 @@ const ReportsPage = () => {
                 <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
                 <span className="text-sm font-medium text-gray-700">Despesas</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-lg sm:text-2xl font-bold text-gray-900">
                 R$ {expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
@@ -334,17 +334,17 @@ const ReportsPage = () => {
                 <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
                 <span className="text-sm font-medium text-gray-700">Saldo</span>
               </div>
-              <div className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-lg sm:text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, signDisplay: 'always' })}
               </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-blue-600">
+          <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div className="text-xs sm:text-sm text-blue-600 text-center sm:text-left">
               Relatório gerado para: {selectedPeriod === 'current_month' ? 'Mês Atual' : selectedPeriod === 'last_month' ? 'Mês Anterior' : 'Ano Atual'} - Despesas por Categoria
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-center space-x-2">
               <button
                 onClick={exportToCSV}
                 className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 flex items-center gap-1"
@@ -364,22 +364,22 @@ const ReportsPage = () => {
         </div>
 
         {/* Despesas por Categoria */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Despesas por Categoria</h2>
+        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Despesas por Categoria</h2>
           
           {loading ? (
             <div className="text-center py-8 text-gray-500">Carregando relatório...</div>
           ) : categoryExpenses.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {categoryExpenses.map((category, index) => (
-                <div key={index} className="flex items-center">
-                  <div className="w-24 text-sm text-gray-700 font-medium">
+                <div key={index} className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0">
+                  <div className="w-full sm:w-20 lg:w-24 text-sm text-gray-700 font-medium truncate">
                     {category.name}
                   </div>
-                  <div className="flex-1 mx-4">
-                    <div className="w-full bg-gray-200 rounded-full h-6 relative">
+                  <div className="flex-1 sm:mx-3 lg:mx-4">
+                    <div className="w-full bg-gray-200 rounded-full h-4 sm:h-6 relative">
                       <div
-                        className="h-6 rounded-full transition-all duration-300"
+                        className="h-4 sm:h-6 rounded-full transition-all duration-300"
                         style={{
                           backgroundColor: category.color,
                           width: `${category.percentage}%`
@@ -387,7 +387,7 @@ const ReportsPage = () => {
                       />
                     </div>
                   </div>
-                  <div className="w-32 text-right">
+                  <div className="w-full sm:w-28 lg:w-32 text-left sm:text-right">
                     <div className="text-sm font-semibold text-gray-900">
                       R$ {category.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>

@@ -196,15 +196,15 @@ const CategoriesPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
           <div className="flex items-center">
-            <h1 className="text-xl font-semibold text-gray-900">Categorias</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Categorias</h1>
           </div>
           
           <button
             onClick={() => openModal()}
-            className="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-2 text-sm font-medium"
+            className="bg-gray-800 text-white px-3 sm:px-4 py-2 rounded-md hover:bg-gray-900 flex items-center justify-center gap-2 text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             Nova Categoria
@@ -212,7 +212,7 @@ const CategoriesPage = () => {
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-3 sm:p-6">
         {/* Tabs */}
         <div className="flex space-x-1 mb-6">
           <button
