@@ -367,93 +367,60 @@ const BudgetPage = () => {
               }
 
               return (
-                <div key={budget.id} className="bg-white rounded-lg border border-gray-200 p-6">
+                <div key={budget.id} className="bg-white rounded-lg border border-gray-200 p-4">
                   {/* Budget Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{budget.name}</h3>
-                      <p className="text-sm text-gray-600">Categoria: {categoryName}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold text-gray-900">
-                        R$ {budget.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </div>
-                      <div className="text-sm text-gray-500 capitalize">{budget.period}</div>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="mb-4">
-                    <div className="flex justify-between text-sm text-gray-600 mb-2">
-                      <span>
-                        R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / 
-                        R$ {budget.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                      <span>{progress.percentage.toFixed(1)}% usado</span>
-                    </div>
-                    
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
-                        className={`h-3 rounded-full transition-all duration-300 ${progressBarColor}`}
-                        style={{ width: `${progress.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Status and Actions */}
-                  <div className="flex items-center justify-between">
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor} ${statusBg}`}>
-                      {progress.isOverBudget && <AlertTriangle className="w-3 h-3 inline mr-1" />}
-                      {!progress.isOverBudget && !progress.isNearLimit && <CheckCircle className="w-3 h-3 inline mr-1" />}
-                      {statusText}
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-gray-900">{budget.name}</h3>
+                    <div className="flex items-center space-x-1">
                       <button
                         onClick={() => startEditing(budget)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteBudget(budget.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Additional Info */}
-                  {progress.isOverBudget && (
-                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center">
-                        <AlertTriangle className="w-4 h-4 text-red-500 mr-2" />
-                        <span className="text-sm text-red-700">
-                          Orçamento Excedido
-                        </span>
-                      </div>
-                      <p className="text-xs text-red-600 mt-1">
-                        Você excedeu seu orçamento em R$ {(progress.spent - budget.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. 
-                        Considere revisar seus gastos nesta categoria.
-                      </p>
+                  {/* Budget Amount */}
+                  <div className="mb-3">
+                    <div className="text-lg font-semibold text-gray-900">
+                      R$ {budget.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
-                  )}
+                    <div className="text-xs text-gray-500 capitalize">{budget.period}</div>
+                  </div>
 
-                  {progress.isNearLimit && !progress.isOverBudget && (
-                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="flex items-center">
-                        <AlertTriangle className="w-4 h-4 text-yellow-500 mr-2" />
-                        <span className="text-sm text-yellow-700">
-                          Próximo do Limite
-                        </span>
-                      </div>
-                      <p className="text-xs text-yellow-600 mt-1">
-                        Você está próximo do seu limite de orçamento. 
-                        Restam R$ {(budget.amount - progress.spent).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para este período.
-                      </p>
+                  {/* Progress Bar */}
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>R$ {progress.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>{progress.percentage.toFixed(1)}%</span>
                     </div>
-                  )}
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-300 ${progressBarColor}`}
+                        style={{ width: `${progress.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex items-center justify-between">
+                    <div className={`px-2 py-1 rounded text-xs font-medium ${statusColor} ${statusBg}`}>
+                      {progress.isOverBudget && <AlertTriangle className="w-3 h-3 inline mr-1" />}
+                      {!progress.isOverBudget && !progress.isNearLimit && <CheckCircle className="w-3 h-3 inline mr-1" />}
+                      {statusText}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {categoryName}
+                    </div>
+                  </div>
                 </div>
               );
             })}
