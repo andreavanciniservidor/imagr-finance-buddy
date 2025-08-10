@@ -278,6 +278,7 @@ const TransactionsPage = () => {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSuccess={fetchTransactions}
+        type="expense"
       />
 
       {editingTransaction && (
