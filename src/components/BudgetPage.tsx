@@ -296,11 +296,7 @@ const BudgetPage = () => {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium text-green-600">Fin</span>
-              <span className="text-sm font-medium text-gray-600">Control</span>
-            </div>
+          <div className="flex items-center">
             <h1 className="text-xl font-semibold text-gray-900">Orçamentos</h1>
           </div>
           
