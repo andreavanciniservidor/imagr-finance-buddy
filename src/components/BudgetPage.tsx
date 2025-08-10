@@ -124,10 +124,7 @@ const BudgetPage = () => {
         .lte('date', lastDayOfMonth.toISOString().split('T')[0]);
 
       if (error) throw error;
-      setTransactions((data || []).map(transaction => ({
-        ...transaction,
-        type: transaction.type as 'income' | 'expense'
-      })));
+      setTransactions(data || []);
     } catch (error) {
       console.error('Erro ao buscar transações:', error);
     }

@@ -62,7 +62,7 @@ const CartoesPage = () => {
     try {
       const { data, error } = await supabase
         .from('cartoes')
-        .select('id, nome, cor, limite, dia_fechamento, dia_vencimento, melhor_dia_compra, created_at, updated_at, user_id')
+        .select('id, nome, cor, dia_fechamento, dia_vencimento, melhor_dia_compra, created_at, updated_at, user_id')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
@@ -279,6 +279,8 @@ const CartoesPage = () => {
     });
   };
 
+
+
   if (loading) {
     return <div className="p-6">Carregando cartões...</div>;
   }
@@ -389,6 +391,8 @@ const CartoesPage = () => {
                   <p className="text-red-500 text-xs mt-1">{formErrors.nome}</p>
                 )}
               </div>
+
+
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
