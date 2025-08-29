@@ -258,6 +258,7 @@ export class FaturaCalculator {
   /**
    * Calculates when a purchase will be launched (appear on the bill)
    * Based on the purchase date and the card's billing cycle
+   * The launch date should be in the same day of the month as the purchase, but in the billing month
    * Includes error handling, fallback logic, and caching for performance
    */
   static calculateLaunchDate(purchaseDate: Date, cartao: CartaoExtended): Date {
@@ -288,20 +289,27 @@ export class FaturaCalculator {
         }
 
         const closingDay = cartao.dia_fechamento;
+        const purchaseDay = purchaseDate.getDate();
         
         // Get the next closing date after the purchase
         const nextClosing = getNextOccurrenceOfDay(purchaseDate, closingDay);
         
-        // The launch date is typically the month after the closing
-        // But we need to consider the due date for the actual billing month
-        const dueDay = cartao.dia_vencimento || (closingDay + CARTAO_DEFAULTS.dia_vencimento_offset);
-        const adjustedDueDay = adjustDayForMonth(dueDay, nextClosing.getFullYear(), nextClosing.getMonth() + 1);
+        // Calculate which billing month this purchase belongs to
+        // If purchase is after closing day in the same month, it goes to next billing cycle
+        let billingMonth = nextClosing.getMonth() + 1; // Month after closing
+        let billingYear = nextClosing.getFullYear();
         
-        // Create the launch date in the month after closing
-        const launchYear = nextClosing.getMonth() === 11 ? nextClosing.getFullYear() + 1 : nextClosing.getFullYear();
-        const launchMonth = nextClosing.getMonth() === 11 ? 1 : nextClosing.getMonth() + 2; // +2 because getMonth() is 0-indexed
+        // Handle year transition
+        if (billingMonth > 11) {
+          billingMonth = 0;
+          billingYear++;
+        }
         
-        const result = createDateWithDayAdjustment(launchYear, launchMonth, adjustedDueDay);
+        // The launch date should be on the same day as the purchase, but in the billing month
+        // Adjust the day if it doesn't exist in the target month (e.g., Feb 30 -> Feb 28/29)
+        const adjustedPurchaseDay = adjustDayForMonth(purchaseDay, billingYear, billingMonth + 1);
+        
+        const result = createDateWithDayAdjustment(billingYear, billingMonth + 1, adjustedPurchaseDay);
         
         // Cache the result
         launchDateCache.set(cacheKey, {
@@ -329,16 +337,31 @@ export class FaturaCalculator {
   /**
    * Fallback calculation for calculateLaunchDate when main calculation fails
    * Uses simple logic without complex date adjustments
+   * Maintains the same day as the purchase date in the billing month
    */
   static getFallbackLaunchDate(purchaseDate: Date, cartao: CartaoExtended): Date {
     try {
       const closingDay = Math.min(Math.max(cartao.dia_fechamento || 15, 1), 31);
-      const dueDay = Math.min(Math.max(cartao.dia_vencimento || (closingDay + 10), 1), 31);
+      const purchaseDay = purchaseDate.getDate();
       
-      // Simple logic: add 1-2 months to purchase date and use due day
+      // Simple logic: determine billing month based on closing day
       const launchDate = new Date(purchaseDate);
-      launchDate.setMonth(launchDate.getMonth() + 2);
-      launchDate.setDate(Math.min(dueDay, new Date(launchDate.getFullYear(), launchDate.getMonth() + 1, 0).getDate()));
+      
+      // If purchase is after closing day, goes to next billing cycle (2 months ahead)
+      // If purchase is before closing day, goes to current billing cycle (1 month ahead)
+      if (purchaseDay > closingDay) {
+        launchDate.setMonth(launchDate.getMonth() + 2);
+      } else {
+        launchDate.setMonth(launchDate.getMonth() + 1);
+      }
+      
+      // Keep the same day as the purchase, adjusting for month boundaries
+      const targetMonth = launchDate.getMonth();
+      const targetYear = launchDate.getFullYear();
+      const lastDayOfMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const adjustedDay = Math.min(purchaseDay, lastDayOfMonth);
+      
+      launchDate.setDate(adjustedDay);
       
       return launchDate;
     } catch (error) {

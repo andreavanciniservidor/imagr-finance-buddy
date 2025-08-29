@@ -132,6 +132,9 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // Limpar cache para garantir cálculos atualizados
+      FaturaCalculator.clearCache();
+      
       fetchCategories();
       fetchCartoes();
       // Definir parcelamento como true por padrão para cartão de crédito
@@ -276,32 +279,8 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   };
 
-  // Função original para calcular a data correta baseada no fechamento do cartão (fallback)
-  const calculateCreditCardDateLegacy = (purchaseDate: string, cartaoId: string) => {
-    if (!cartaoId) return purchaseDate;
-
-    const cartao = cartoes.find(c => c.id === cartaoId);
-    if (!cartao) return purchaseDate;
-
-    const [year, month, day] = purchaseDate.split('-').map(Number);
-    const purchaseDateObj = new Date(year, month - 1, day);
-    
-    const diaFechamento = cartao.dia_fechamento;
-    
-    if (day > diaFechamento) {
-      purchaseDateObj.setMonth(purchaseDateObj.getMonth() + 2);
-    } else {
-      purchaseDateObj.setMonth(purchaseDateObj.getMonth() + 1);
-    }
-    
-    const newYear = purchaseDateObj.getFullYear();
-    const newMonth = String(purchaseDateObj.getMonth() + 1).padStart(2, '0');
-    const newDay = String(purchaseDateObj.getDate()).padStart(2, '0');
-    
-    return `${newYear}-${newMonth}-${newDay}`;
-  };
-
-  // Função melhorada para calcular a data correta usando FaturaCalculator
+  // Função para calcular a data de lançamento usando FaturaCalculator
+  // Agora mantém o mesmo dia da compra no mês de lançamento
   const calculateCreditCardDate = (purchaseDate: string, cartaoId: string) => {
     if (!cartaoId) return purchaseDate;
 
@@ -309,6 +288,9 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     if (!cartao) return purchaseDate;
 
     try {
+      // Limpar cache para garantir cálculo atualizado
+      FaturaCalculator.clearCacheForCard(cartaoId);
+      
       const [year, month, day] = purchaseDate.split('-').map(Number);
       const purchaseDateObj = new Date(year, month - 1, day);
       
@@ -320,8 +302,34 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       
       return `${newYear}-${newMonth}-${newDay}`;
     } catch (error) {
-      console.warn('Erro no cálculo de data do cartão, usando lógica legacy:', error);
-      return calculateCreditCardDateLegacy(purchaseDate, cartaoId);
+      console.warn('Erro no cálculo de data do cartão, usando fallback simples:', error);
+      
+      // Fallback simples: manter o mesmo dia no próximo mês
+      const [year, month, day] = purchaseDate.split('-').map(Number);
+      const launchDate = new Date(year, month - 1, day);
+      
+      // Se a compra foi após o fechamento, vai para 2 meses à frente
+      // Se foi antes do fechamento, vai para 1 mês à frente
+      const closingDay = cartao.dia_fechamento;
+      if (day > closingDay) {
+        launchDate.setMonth(launchDate.getMonth() + 2);
+      } else {
+        launchDate.setMonth(launchDate.getMonth() + 1);
+      }
+      
+      // Ajustar o dia se necessário (ex: 31 de janeiro -> 28/29 de fevereiro)
+      const targetMonth = launchDate.getMonth();
+      const targetYear = launchDate.getFullYear();
+      const lastDayOfMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const adjustedDay = Math.min(day, lastDayOfMonth);
+      
+      launchDate.setDate(adjustedDay);
+      
+      const newYear = launchDate.getFullYear();
+      const newMonth = String(launchDate.getMonth() + 1).padStart(2, '0');
+      const newDay = String(launchDate.getDate()).padStart(2, '0');
+      
+      return `${newYear}-${newMonth}-${newDay}`;
     }
   };
 
