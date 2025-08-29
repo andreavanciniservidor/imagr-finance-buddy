@@ -363,6 +363,10 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             ? `${formData.description} (${i + 1}/${formData.installments})`
             : formData.description;
 
+          // Garantir que a data da parcela seja enviada no formato correto
+          const [instYear, instMonth, instDay] = installmentLaunchDate.split('-').map(Number);
+          const instDateForDB = new Date(instYear, instMonth - 1, instDay);
+          
           transactions.push({
             user_id: user.id,
             amount: parseFloat(formData.amount),
@@ -371,7 +375,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             account_id: null,
             payment_method: formData.payment_method,
             cartao_id: formData.payment_method === 'credit_card' ? formData.cartao_id || null : null,
-            date: installmentLaunchDate,
+            date: instDateForDB.toISOString().split('T')[0], // Enviar apenas a parte da data
             type: formData.transactionType
           });
         }
@@ -390,6 +394,10 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           transactionDate = calculateCreditCardDate(formData.date, formData.cartao_id);
         }
 
+        // Garantir que a data seja enviada no formato correto para evitar problemas de fuso horário
+        const [dateYear, dateMonth, dateDay] = transactionDate.split('-').map(Number);
+        const dateForDB = new Date(dateYear, dateMonth - 1, dateDay);
+        
         const { error } = await supabase.from('transactions').insert({
           user_id: user.id,
           amount: parseFloat(formData.amount),
@@ -398,7 +406,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           account_id: null,
           payment_method: formData.payment_method,
           cartao_id: formData.payment_method === 'credit_card' ? formData.cartao_id || null : null,
-          date: transactionDate,
+          date: dateForDB.toISOString().split('T')[0], // Enviar apenas a parte da data (YYYY-MM-DD)
           type: formData.transactionType
         });
 
