@@ -62,7 +62,7 @@ const CartoesPage = () => {
     try {
       const { data, error } = await supabase
         .from('cartoes')
-        .select('id, nome, cor, dia_fechamento, dia_vencimento, melhor_dia_compra, created_at, updated_at, user_id')
+        .select('id, nome, cor, dia_fechamento, dia_vencimento, melhor_dia_compra, limite, created_at, updated_at, user_id')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
